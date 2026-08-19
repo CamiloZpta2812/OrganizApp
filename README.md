@@ -69,19 +69,27 @@ cada quien tiene su propia cuenta y sus propios datos, completamente separados.
    - **Project URL** → esta es tu `VITE_SUPABASE_URL`
    - **anon public key** → esta es tu `VITE_SUPABASE_ANON_KEY`
 
-### 2. Crear la tabla (protegida por usuario)
+### 2. Crear la tabla (protegida por usuario, dividida por secciones)
 
-> Si ya habías creado la tabla `organizapp_sync` con el modelo anterior (código compartido),
-> bórrala primero con `drop table organizapp_sync;` antes de crear la nueva — las estructuras
-> no son compatibles entre sí.
+> Si ya tenías la tabla `organizapp_sync` de una versión anterior (código compartido, o una
+> sola fila por usuario), bórrala primero con `drop table organizapp_sync;` antes de crear
+> la nueva — la estructura cambió y no es compatible con las versiones previas. Esto borra
+> los datos que tuvieras en la nube (tus dispositivos los vuelven a subir solos en cuanto
+> abras la app con la cuenta ya logueada).
+
+Ahora cada "sección" de la app (tareas, recordatorios, notas, categorías, progreso/rachas,
+configuración) se guarda en su propia fila, para que editar una sección en un dispositivo
+nunca sobreescriba lo que otro dispositivo esté guardando en otra sección al mismo tiempo.
 
 En el proyecto de Supabase, ve a **SQL Editor** y ejecuta:
 
 ```sql
 create table organizapp_sync (
-  user_id uuid primary key references auth.users(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  seccion text not null,
   data jsonb not null,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (user_id, seccion)
 );
 
 alter table organizapp_sync enable row level security;

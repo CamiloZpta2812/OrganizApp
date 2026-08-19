@@ -6,12 +6,17 @@ import {
   CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
   Cloud, CloudOff, LogOut, StickyNote, Bold, Italic, List,
 } from 'lucide-react';
-import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirEstado, descargarEstado, suscribirseACambios } from './sync';
+import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirSeccion, descargarSeccion, suscribirseATodo } from './sync';
 
 /* ============================================================
    CONSTANTES Y DATOS ESTÁTICOS
    ============================================================ */
 const STORAGE_KEY = 'organizapp_data_v2';
+
+// Secciones independientes para la sincronización en la nube: cada una vive en su propia
+// fila, así una edición en una sección (p. ej. tareas) nunca sobreescribe otra (p. ej.
+// recordatorios) aunque se estén editando al mismo tiempo desde dispositivos distintos.
+const SYNC_SECCIONES = ['tareas', 'recordatorios', 'notas', 'categorias', 'progreso', 'config'];
 
 // Categorías de recordatorios y notas: empiezan con estas por defecto, pero se pueden
 // crear, renombrar o borrar libremente (igual que las etiquetas de tareas).
@@ -737,8 +742,10 @@ export default function OrganizApp() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authAviso, setAuthAviso] = useState('');
-  const pushTimeoutRef = useRef(null);
-  const aplicandoRemotoRef = useRef(false);
+  const pushTimeoutsRef = useRef({});
+  const aplicandoRemotoRef = useRef({});
+  const pullListoRef = useRef({});
+  const seccionesDataRef = useRef({});
 
   const [notifPermiso, setNotifPermiso] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
@@ -987,92 +994,166 @@ export default function OrganizApp() {
       nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
       horarioLaboral, ultimaAlertaJornada, resumenSemanal]);
 
-  const aplicarEstadoRemoto = useCallback((remoto) => {
-    if (!remoto) return;
-    aplicandoRemotoRef.current = true;
-    setTareas(remoto.tareas || []);
-    setCarpetas(remoto.carpetas || []);
-    setCategorias(remoto.categorias && remoto.categorias.length ? remoto.categorias : categoriasPorDefecto());
-    setRecordatorios(remoto.recordatorios || []);
-    setNotas(remoto.notas || []);
-    setHistorial(remoto.historial || []);
-    setRacha(remoto.racha || 0);
-    setMejorRacha(remoto.mejorRacha ?? remoto.racha ?? 0);
-    setMetaPorcentaje(remoto.metaPorcentaje ?? 70);
-    setLastActiveDate(remoto.lastActiveDate || hoyISO());
-    setNombre(remoto.nombre || '');
-    setLastGreetingDate(remoto.lastGreetingDate || '');
-    setOnboardingCompleto(remoto.onboardingCompleto ?? true);
-    setFinDeSemanaLibre(remoto.finDeSemanaLibre ?? true);
-    setFestivosManual(remoto.festivosManual || []);
-    setHorarioLaboral(remoto.horarioLaboral || horarioLaboralPorDefecto());
-    setUltimaAlertaJornada(remoto.ultimaAlertaJornada || '');
-    setResumenSemanal(remoto.resumenSemanal || null);
-    // Permite que los efectos de guardado/push corran de nuevo en el siguiente ciclo
-    setTimeout(() => { aplicandoRemotoRef.current = false; }, 0);
+  // Snapshot de cada sección, recalculado en cada render (no solo dentro de un efecto) para que,
+  // sin importar el orden de ejecución, siempre haya datos frescos disponibles de inmediato.
+  seccionesDataRef.current = {
+    tareas: { tareas, carpetas },
+    recordatorios: { recordatorios },
+    notas: { notas },
+    categorias: { categorias },
+    progreso: { historial, racha, mejorRacha, resumenSemanal, ultimaAlertaJornada },
+    config: {
+      metaPorcentaje, nombre, finDeSemanaLibre, festivosManual, horarioLaboral,
+      onboardingCompleto, lastActiveDate, lastGreetingDate,
+    },
+  };
+
+  // Aplica los datos recibidos de una sección (por bajada inicial o en tiempo real) al estado local
+  const aplicarSeccion = useCallback((seccion, data) => {
+    if (!data) return;
+    aplicandoRemotoRef.current[seccion] = true;
+    switch (seccion) {
+      case 'tareas':
+        setTareas(data.tareas || []);
+        setCarpetas(data.carpetas || []);
+        break;
+      case 'recordatorios':
+        setRecordatorios(data.recordatorios || []);
+        break;
+      case 'notas':
+        setNotas(data.notas || []);
+        break;
+      case 'categorias':
+        setCategorias(data.categorias && data.categorias.length ? data.categorias : categoriasPorDefecto());
+        break;
+      case 'progreso':
+        setHistorial(data.historial || []);
+        setRacha(data.racha || 0);
+        setMejorRacha(data.mejorRacha ?? data.racha ?? 0);
+        setResumenSemanal(data.resumenSemanal || null);
+        setUltimaAlertaJornada(data.ultimaAlertaJornada || '');
+        break;
+      case 'config':
+        setMetaPorcentaje(data.metaPorcentaje ?? 70);
+        setNombre(data.nombre || '');
+        setFinDeSemanaLibre(data.finDeSemanaLibre ?? true);
+        setFestivosManual(data.festivosManual || []);
+        setHorarioLaboral(data.horarioLaboral || horarioLaboralPorDefecto());
+        setOnboardingCompleto(data.onboardingCompleto ?? true);
+        setLastActiveDate(data.lastActiveDate || hoyISO());
+        setLastGreetingDate(data.lastGreetingDate || '');
+        break;
+      default:
+        break;
+    }
+    // Permite que el efecto de guardado/push de esa sección corra de nuevo en el siguiente ciclo
+    setTimeout(() => { aplicandoRemotoRef.current[seccion] = false; }, 0);
   }, []);
 
-  // Guarda en localStorage siempre; si hay sesión activa, además sube a la nube (con debounce)
-  useEffect(() => {
-    const estadoActual = construirEstadoCompleto();
-    guardarEstado(estadoActual);
-
-    if (session && syncDisponible && !aplicandoRemotoRef.current) {
-      if (pushTimeoutRef.current) clearTimeout(pushTimeoutRef.current);
-      pushTimeoutRef.current = setTimeout(async () => {
-        setSyncStatus('syncing');
-        const res = await subirEstado(estadoActual);
-        if (res.ok) {
-          setSyncStatus('synced');
-          setLastSyncedAt(new Date());
-          setSyncError('');
-        } else {
-          setSyncStatus('error');
-          setSyncError(res.error || 'Error al sincronizar');
-        }
-      }, 1200);
-    }
-    return () => {
-      if (pushTimeoutRef.current) clearTimeout(pushTimeoutRef.current);
-    };
-  }, [construirEstadoCompleto, session]);
-
-  // Al detectar sesión activa (login, o sesión ya guardada en el navegador): trae lo más reciente
-  useEffect(() => {
-    if (!session || !syncDisponible) return;
-    let cancelado = false;
-    (async () => {
+  // Programa la subida (con debounce) de UNA sección específica, solo si ya se completó
+  // su primera bajada en esta sesión (evita que datos viejos de este dispositivo sobreescriban
+  // cambios recientes de otro dispositivo justo al abrir la app).
+  const programarPushSeccion = useCallback((seccion) => {
+    if (!(session && syncDisponible && !aplicandoRemotoRef.current[seccion] && pullListoRef.current[seccion])) return;
+    if (pushTimeoutsRef.current[seccion]) clearTimeout(pushTimeoutsRef.current[seccion]);
+    pushTimeoutsRef.current[seccion] = setTimeout(async () => {
       setSyncStatus('syncing');
-      const res = await descargarEstado();
-      if (cancelado) return;
+      // Se sube el estado más reciente al momento de disparar (no uno capturado hace 1.2s).
+      const res = await subirSeccion(seccion, seccionesDataRef.current[seccion]);
       if (res.ok) {
-        if (res.data) {
-          aplicarEstadoRemoto(res.data);
-        } else {
-          // Cuenta recién creada: todavía no hay nada en la nube, subimos lo que hay en este dispositivo
-          subirEstado(construirEstadoCompleto());
-        }
         setSyncStatus('synced');
-        setLastSyncedAt(res.updatedAt ? new Date(res.updatedAt) : new Date());
+        setLastSyncedAt(new Date());
         setSyncError('');
       } else {
         setSyncStatus('error');
-        setSyncError(res.error || 'Error al descargar');
+        setSyncError(res.error || `Error al sincronizar ${seccion}`);
       }
+    }, 1200);
+  }, [session]);
+
+  // Guarda todo en localStorage siempre (esto nunca depende de la nube, así que nunca se
+  // pierde nada local aunque la sincronización falle o no esté configurada).
+  useEffect(() => {
+    guardarEstado(construirEstadoCompleto());
+  }, [construirEstadoCompleto]);
+
+  // Al detectar sesión activa (login, o sesión ya guardada en el navegador): trae lo más reciente
+  // de CADA sección por separado, antes de permitir que ese dispositivo suba nada de esa sección.
+  useEffect(() => {
+    if (!session || !syncDisponible) {
+      pullListoRef.current = {};
+      return;
+    }
+    pullListoRef.current = {};
+    let cancelado = false;
+    (async () => {
+      setSyncStatus('syncing');
+      await Promise.all(SYNC_SECCIONES.map(async (seccion) => {
+        const res = await descargarSeccion(seccion);
+        if (cancelado) return;
+        if (res.ok) {
+          if (res.data) {
+            aplicarSeccion(seccion, res.data);
+          } else {
+            // Esta sección todavía no existe en la nube para esta cuenta: subimos lo local
+            subirSeccion(seccion, seccionesDataRef.current[seccion]);
+          }
+        }
+        pullListoRef.current[seccion] = true;
+      }));
+      if (cancelado) return;
+      setSyncStatus('synced');
+      setLastSyncedAt(new Date());
+      setSyncError('');
     })();
     return () => { cancelado = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  // Mientras la app está abierta en varios dispositivos con la misma cuenta, escucha cambios en vivo
+  // Un efecto de subida por sección: cada uno solo reacciona a los cambios de SU propia parte
+  // del estado, así editar tareas en un dispositivo nunca reinicia ni interfiere con la subida
+  // pendiente de recordatorios (o cualquier otra sección) en otro dispositivo.
+  useEffect(() => {
+    programarPushSeccion('tareas');
+    return () => { if (pushTimeoutsRef.current.tareas) clearTimeout(pushTimeoutsRef.current.tareas); };
+  }, [tareas, carpetas, programarPushSeccion]);
+
+  useEffect(() => {
+    programarPushSeccion('recordatorios');
+    return () => { if (pushTimeoutsRef.current.recordatorios) clearTimeout(pushTimeoutsRef.current.recordatorios); };
+  }, [recordatorios, programarPushSeccion]);
+
+  useEffect(() => {
+    programarPushSeccion('notas');
+    return () => { if (pushTimeoutsRef.current.notas) clearTimeout(pushTimeoutsRef.current.notas); };
+  }, [notas, programarPushSeccion]);
+
+  useEffect(() => {
+    programarPushSeccion('categorias');
+    return () => { if (pushTimeoutsRef.current.categorias) clearTimeout(pushTimeoutsRef.current.categorias); };
+  }, [categorias, programarPushSeccion]);
+
+  useEffect(() => {
+    programarPushSeccion('progreso');
+    return () => { if (pushTimeoutsRef.current.progreso) clearTimeout(pushTimeoutsRef.current.progreso); };
+  }, [historial, racha, mejorRacha, resumenSemanal, ultimaAlertaJornada, programarPushSeccion]);
+
+  useEffect(() => {
+    programarPushSeccion('config');
+    return () => { if (pushTimeoutsRef.current.config) clearTimeout(pushTimeoutsRef.current.config); };
+  }, [metaPorcentaje, nombre, finDeSemanaLibre, festivosManual, horarioLaboral,
+      onboardingCompleto, lastActiveDate, lastGreetingDate, programarPushSeccion]);
+
+  // Mientras la app está abierta en varios dispositivos con la misma cuenta, escucha cambios
+  // en vivo de cualquier sección y los aplica a la parte correspondiente del estado local.
   useEffect(() => {
     if (!session || !syncDisponible) return;
-    const cancelarSuscripcion = suscribirseACambios((dataRemota, updatedAt) => {
-      aplicarEstadoRemoto(dataRemota);
+    const cancelarSuscripcion = suscribirseATodo((seccion, data, updatedAt) => {
+      aplicarSeccion(seccion, data);
       setLastSyncedAt(new Date(updatedAt));
     });
     return cancelarSuscripcion;
-  }, [session, aplicarEstadoRemoto]);
+  }, [session, aplicarSeccion]);
 
   // Detecta la sesión guardada en el navegador al abrir la app, y reacciona a login/logout
   useEffect(() => {

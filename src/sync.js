@@ -54,22 +54,29 @@ export function suscribirseASesion(callback) {
 }
 
 /* ============================================================
-   DATOS (una fila por usuario, protegida por Row Level Security)
+   DATOS POR SECCIÓN
+   Cada "sección" (tareas, recordatorios, notas, categorías, progreso,
+   configuración) vive en su propia fila (user_id, seccion), con su propio
+   updated_at. Así, un cambio en una sección desde un dispositivo nunca
+   sobreescribe lo que otro dispositivo esté guardando en otra sección.
    ============================================================ */
 
-export async function subirEstado(data) {
+export async function subirSeccion(seccion, data) {
   if (!supabase) return { ok: false, error: 'Sincronización no disponible' };
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData?.user?.id;
   if (!userId) return { ok: false, error: 'No has iniciado sesión' };
   const { error } = await supabase
     .from(TABLA)
-    .upsert({ user_id: userId, data, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    .upsert(
+      { user_id: userId, seccion, data, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,seccion' }
+    );
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
-export async function descargarEstado() {
+export async function descargarSeccion(seccion) {
   if (!supabase) return { ok: false, error: 'Sincronización no disponible' };
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData?.user?.id;
@@ -78,14 +85,17 @@ export async function descargarEstado() {
     .from(TABLA)
     .select('data, updated_at')
     .eq('user_id', userId)
+    .eq('seccion', seccion)
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
-  if (!data) return { ok: true, data: null, updatedAt: null }; // cuenta nueva, aún sin datos guardados
+  if (!data) return { ok: true, data: null, updatedAt: null }; // esta sección aún no existe en la nube
   return { ok: true, data: data.data, updatedAt: data.updated_at };
 }
 
-// Escucha cambios en vivo de los datos del usuario autenticado
-export function suscribirseACambios(onCambio) {
+// Un solo canal en tiempo real que escucha TODAS las secciones del usuario y
+// entrega cada cambio con su nombre de sección, para que el que llama decida
+// a qué parte del estado local aplicarlo.
+export function suscribirseATodo(onCambio) {
   if (!supabase) return () => {};
   let canal = null;
   let cancelado = false;
@@ -99,8 +109,8 @@ export function suscribirseACambios(onCambio) {
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLA, filter: `user_id=eq.${userId}` },
         (payload) => {
-          if (payload.new && payload.new.data) {
-            onCambio(payload.new.data, payload.new.updated_at);
+          if (payload.new && payload.new.seccion && payload.new.data) {
+            onCambio(payload.new.seccion, payload.new.data, payload.new.updated_at);
           }
         }
       )
