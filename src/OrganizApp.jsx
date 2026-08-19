@@ -4,7 +4,7 @@ import {
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
   Target, ListChecks, LayoutGrid, Award, ListOrdered,
   CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
-  Cloud, CloudOff, LogOut,
+  Cloud, CloudOff, LogOut, StickyNote, Bold, Italic, List,
 } from 'lucide-react';
 import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirEstado, descargarEstado, suscribirseACambios } from './sync';
 
@@ -13,17 +13,34 @@ import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesion
    ============================================================ */
 const STORAGE_KEY = 'organizapp_data_v2';
 
-// Categorías: ahora solo aplican a los recordatorios (las tareas son siempre de trabajo)
-const CATEGORIAS = {
-  trabajo:  { label: 'Trabajo',  color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-  salud:    { label: 'Salud',    color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  social:   { label: 'Social',   color: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-  pareja:   { label: 'Pareja',   color: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
-  personal: { label: 'Personal', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-  otro:     { label: 'Otro',     color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
-};
+// Categorías de recordatorios y notas: empiezan con estas por defecto, pero se pueden
+// crear, renombrar o borrar libremente (igual que las etiquetas de tareas).
+function categoriasPorDefecto() {
+  return [
+    { id: 'trabajo', nombre: 'Trabajo' },
+    { id: 'salud', nombre: 'Salud' },
+    { id: 'social', nombre: 'Social' },
+    { id: 'pareja', nombre: 'Pareja' },
+    { id: 'personal', nombre: 'Personal' },
+    { id: 'otro', nombre: 'Otro' },
+  ];
+}
 
-// Paleta rotativa para las carpetas de tareas
+const CATEGORIA_COLORES = [
+  'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  'bg-pink-500/20 text-pink-300 border-pink-500/40',
+  'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  'bg-slate-500/20 text-slate-300 border-slate-500/40',
+  'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+  'bg-rose-500/20 text-rose-300 border-rose-500/40',
+];
+function colorCategoria(index) {
+  return CATEGORIA_COLORES[((index % CATEGORIA_COLORES.length) + CATEGORIA_COLORES.length) % CATEGORIA_COLORES.length];
+}
+
+// Paleta rotativa para las etiquetas de tareas
 const CARPETA_COLORES = [
   'bg-blue-500/20 text-blue-300 border-blue-500/40',
   'bg-purple-500/20 text-purple-300 border-purple-500/40',
@@ -37,6 +54,7 @@ function colorCarpeta(index) {
 }
 
 const DURACIONES_RAPIDAS = [15, 30, 45, 60, 90, 120];
+
 
 const NIVEL_BADGE = {
   1: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
@@ -458,11 +476,11 @@ function CoachToast({ mensaje }) {
   );
 }
 
-function CategoriaBadge({ categoria }) {
-  const info = CATEGORIAS[categoria] || CATEGORIAS.otro;
+function CategoriaBadge({ nombre, colorClass }) {
+  if (!nombre) return null;
   return (
-    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${info.color}`}>
-      {info.label}
+    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${colorClass}`}>
+      {nombre}
     </span>
   );
 }
@@ -537,7 +555,7 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete,
   );
 }
 
-function ReminderCard({ recordatorio, onToggle, onDelete, onEdit }) {
+function ReminderCard({ recordatorio, categoriaNombre, categoriaColorClass, onToggle, onDelete, onEdit }) {
   return (
     <div
       onClick={() => onEdit(recordatorio)}
@@ -562,7 +580,7 @@ function ReminderCard({ recordatorio, onToggle, onDelete, onEdit }) {
           {recordatorio.titulo}
         </p>
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          <CategoriaBadge categoria={recordatorio.categoria} />
+          {categoriaNombre && <CategoriaBadge nombre={categoriaNombre} colorClass={categoriaColorClass} />}
           <span className="flex items-center gap-1 text-[11px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full">
             <CalendarClock className="w-3 h-3" /> {formatFechaCorta(recordatorio.fecha)} · {recordatorio.hora}
           </span>
@@ -579,6 +597,88 @@ function ReminderCard({ recordatorio, onToggle, onDelete, onEdit }) {
     </div>
   );
 }
+
+// Convierte el HTML de una nota en un texto plano corto para la vista previa
+function stripHtmlPreview(html, maxLen = 140) {
+  if (!html) return '';
+  const texto = html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return texto.length > maxLen ? texto.slice(0, maxLen) + '…' : texto;
+}
+
+function NotaCard({ nota, categoriaNombre, categoriaColorClass, onEdit, onDelete }) {
+  const preview = stripHtmlPreview(nota.contenido);
+  return (
+    <div
+      onClick={() => onEdit(nota)}
+      className="group relative flex flex-col gap-1.5 p-3 rounded-xl border bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09] cursor-pointer transition-all duration-300"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-100 break-words flex-1 min-w-0">
+          {nota.titulo || 'Sin título'}
+        </p>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(nota.id); }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
+          aria-label="Eliminar nota"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      {preview && <p className="text-xs text-slate-400 line-clamp-2">{preview}</p>}
+      <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+        {categoriaNombre && <CategoriaBadge nombre={categoriaNombre} colorClass={categoriaColorClass} />}
+        <span className="text-[11px] text-slate-600">{formatFechaCorta(nota.actualizado.split('T')[0])}</span>
+      </div>
+    </div>
+  );
+}
+
+// Editor de texto enriquecido simple para notas: negrilla, cursiva y viñetas.
+// Usa contentEditable de forma "no controlada" (solo se fija el contenido inicial al montar)
+// para evitar que el cursor salte al escribir; el padre debe usar `key` para forzar un
+// remontaje al cambiar de nota.
+function NotaContentEditor({ initialValue, onChange }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = initialValue || '';
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ejecutarComando = (cmd) => {
+    if (ref.current) ref.current.focus();
+    document.execCommand(cmd, false, null);
+    if (ref.current) onChange(ref.current.innerHTML);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <button type="button" onClick={() => ejecutarComando('bold')} className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10" aria-label="Negrilla">
+          <Bold className="w-4 h-4" />
+        </button>
+        <button type="button" onClick={() => ejecutarComando('italic')} className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10" aria-label="Cursiva">
+          <Italic className="w-4 h-4" />
+        </button>
+        <button type="button" onClick={() => ejecutarComando('insertUnorderedList')} className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10" aria-label="Viñetas">
+          <List className="w-4 h-4" />
+        </button>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={e => onChange(e.currentTarget.innerHTML)}
+        className="min-h-[140px] max-h-[320px] overflow-y-auto bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-400/60 leading-relaxed
+          [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic
+          empty:before:content-['Escribe_tu_nota_aquí...'] empty:before:text-slate-600"
+      />
+    </div>
+  );
+}
+
 
 function Modal({ titulo, onClose, children }) {
   return (
@@ -611,7 +711,9 @@ export default function OrganizApp() {
 
   const [tareas, setTareas] = useState(saved.tareas || []);
   const [carpetas, setCarpetas] = useState(saved.carpetas || []);
+  const [categorias, setCategorias] = useState(saved.categorias && saved.categorias.length ? saved.categorias : categoriasPorDefecto());
   const [recordatorios, setRecordatorios] = useState(saved.recordatorios || []);
+  const [notas, setNotas] = useState(saved.notas || []);
   const [historial, setHistorial] = useState(saved.historial || []);
   const [racha, setRacha] = useState(saved.racha || 0);
   const [mejorRacha, setMejorRacha] = useState(saved.mejorRacha ?? saved.racha ?? 0);
@@ -666,8 +768,18 @@ export default function OrganizApp() {
   const [nuevaCarpetaSettings, setNuevaCarpetaSettings] = useState('');
   const [carpetaEditandoId, setCarpetaEditandoId] = useState(null);
   const [carpetaEditandoNombre, setCarpetaEditandoNombre] = useState('');
+  const [nuevaCategoriaSettings, setNuevaCategoriaSettings] = useState('');
+  const [categoriaEditandoId, setCategoriaEditandoId] = useState(null);
+  const [categoriaEditandoNombre, setCategoriaEditandoNombre] = useState('');
+  const [mostrarNuevaCategoriaRecordatorio, setMostrarNuevaCategoriaRecordatorio] = useState(false);
+  const [nombreNuevaCategoriaRecordatorio, setNombreNuevaCategoriaRecordatorio] = useState('');
+  const [mostrarNuevaCategoriaNota, setMostrarNuevaCategoriaNota] = useState(false);
+  const [nombreNuevaCategoriaNota, setNombreNuevaCategoriaNota] = useState('');
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingRecordatorioId, setEditingRecordatorioId] = useState(null);
+  const [showNotaModal, setShowNotaModal] = useState(false);
+  const [editingNotaId, setEditingNotaId] = useState(null);
+  const [notaFiltroCategoria, setNotaFiltroCategoria] = useState(null);
   const [cuadrantesAbiertos, setCuadrantesAbiertos] = useState({
     hacer: true, programar: true, delegar: true, eliminar: true,
   });
@@ -678,6 +790,10 @@ export default function OrganizApp() {
 
   const [formRecordatorio, setFormRecordatorio] = useState({
     titulo: '', categoria: 'trabajo', fecha: hoyISO(), hora: '',
+  });
+
+  const [formNota, setFormNota] = useState({
+    titulo: '', contenido: '', categoriaId: null,
   });
 
   const nombreMostrado = nombre.trim() || 'Humano';
@@ -864,10 +980,10 @@ export default function OrganizApp() {
   }, [horarioLaboral, tareas, metaPorcentaje, ultimaAlertaJornada, notifPermiso, nombreMostrado]);
 
   const construirEstadoCompleto = useCallback(() => ({
-    tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
+    tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje,
     lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
     finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada, resumenSemanal,
-  }), [tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
+  }), [tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
       nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
       horarioLaboral, ultimaAlertaJornada, resumenSemanal]);
 
@@ -876,7 +992,9 @@ export default function OrganizApp() {
     aplicandoRemotoRef.current = true;
     setTareas(remoto.tareas || []);
     setCarpetas(remoto.carpetas || []);
+    setCategorias(remoto.categorias && remoto.categorias.length ? remoto.categorias : categoriasPorDefecto());
     setRecordatorios(remoto.recordatorios || []);
+    setNotas(remoto.notas || []);
     setHistorial(remoto.historial || []);
     setRacha(remoto.racha || 0);
     setMejorRacha(remoto.mejorRacha ?? remoto.racha ?? 0);
@@ -1070,6 +1188,119 @@ export default function OrganizApp() {
     if (carpetaEditandoId === id) cancelarEdicionCarpeta();
   };
 
+  // --- Categorías dinámicas (recordatorios y notas) ---
+  const getCategoria = useCallback((id) => categorias.find(c => c.id === id) || null, [categorias]);
+  const getCategoriaColorClass = useCallback((id) => {
+    const i = categorias.findIndex(c => c.id === id);
+    return i >= 0 ? colorCategoria(i) : colorCategoria(0);
+  }, [categorias]);
+
+  const crearCategoria = (nombre) => {
+    const nombreLimpio = nombre.trim();
+    if (!nombreLimpio) return null;
+    const nueva = { id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, nombre: nombreLimpio };
+    setCategorias(prev => [...prev, nueva]);
+    return nueva;
+  };
+
+  const confirmarNuevaCategoriaRecordatorio = () => {
+    const nueva = crearCategoria(nombreNuevaCategoriaRecordatorio);
+    if (!nueva) return;
+    setFormRecordatorio(prev => ({ ...prev, categoria: nueva.id }));
+    setNombreNuevaCategoriaRecordatorio('');
+    setMostrarNuevaCategoriaRecordatorio(false);
+  };
+
+  const confirmarNuevaCategoriaNota = () => {
+    const nueva = crearCategoria(nombreNuevaCategoriaNota);
+    if (!nueva) return;
+    setFormNota(prev => ({ ...prev, categoriaId: nueva.id }));
+    setNombreNuevaCategoriaNota('');
+    setMostrarNuevaCategoriaNota(false);
+  };
+
+  const agregarCategoriaSettings = () => {
+    crearCategoria(nuevaCategoriaSettings);
+    setNuevaCategoriaSettings('');
+  };
+
+  const iniciarEdicionCategoria = (c) => {
+    setCategoriaEditandoId(c.id);
+    setCategoriaEditandoNombre(c.nombre);
+  };
+
+  const guardarEdicionCategoria = () => {
+    const nombreLimpio = categoriaEditandoNombre.trim();
+    if (!nombreLimpio) return;
+    setCategorias(prev => prev.map(c => c.id === categoriaEditandoId ? { ...c, nombre: nombreLimpio } : c));
+    setCategoriaEditandoId(null);
+    setCategoriaEditandoNombre('');
+  };
+
+  const cancelarEdicionCategoria = () => {
+    setCategoriaEditandoId(null);
+    setCategoriaEditandoNombre('');
+  };
+
+  const eliminarCategoria = (id) => {
+    setCategorias(prev => prev.filter(c => c.id !== id));
+    setRecordatorios(prev => prev.map(r => r.categoria === id ? { ...r, categoria: null } : r));
+    setNotas(prev => prev.map(n => n.categoriaId === id ? { ...n, categoriaId: null } : n));
+    if (notaFiltroCategoria === id) setNotaFiltroCategoria(null);
+    if (formRecordatorio.categoria === id) setFormRecordatorio(prev => ({ ...prev, categoria: null }));
+    if (formNota.categoriaId === id) setFormNota(prev => ({ ...prev, categoriaId: null }));
+    if (categoriaEditandoId === id) cancelarEdicionCategoria();
+  };
+
+  // --- Notas ---
+  const abrirNuevaNota = () => {
+    setFormNota({ titulo: '', contenido: '', categoriaId: null });
+    setEditingNotaId(null);
+    setShowNotaModal(true);
+  };
+
+  const abrirEditarNota = (nota) => {
+    setFormNota({ titulo: nota.titulo, contenido: nota.contenido, categoriaId: nota.categoriaId || null });
+    setEditingNotaId(nota.id);
+    setShowNotaModal(true);
+  };
+
+  const cerrarModalNota = () => {
+    setShowNotaModal(false);
+    setEditingNotaId(null);
+    setMostrarNuevaCategoriaNota(false);
+    setNombreNuevaCategoriaNota('');
+  };
+
+  const guardarNota = () => {
+    const tituloLimpio = formNota.titulo.trim();
+    const contenidoVacio = stripHtmlPreview(formNota.contenido).length === 0;
+    if (!tituloLimpio && contenidoVacio) return;
+    const ahora = new Date().toISOString();
+    if (editingNotaId) {
+      setNotas(prev => prev.map(n => n.id === editingNotaId ? {
+        ...n,
+        titulo: tituloLimpio,
+        contenido: formNota.contenido,
+        categoriaId: formNota.categoriaId || null,
+        actualizado: ahora,
+      } : n));
+    } else {
+      setNotas(prev => [...prev, {
+        id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        titulo: tituloLimpio,
+        contenido: formNota.contenido,
+        categoriaId: formNota.categoriaId || null,
+        actualizado: ahora,
+      }]);
+    }
+    cerrarModalNota();
+  };
+
+  const eliminarNota = (id) => {
+    setNotas(prev => prev.filter(n => n.id !== id));
+  };
+
   const abrirNuevaTarea = () => {
     setForm({ titulo: '', carpetaId: null, duracion: 30, nivel: 3 });
     setEditingTaskId(null);
@@ -1196,6 +1427,8 @@ export default function OrganizApp() {
   const cerrarModalRecordatorio = () => {
     setShowAddRecordatorio(false);
     setEditingRecordatorioId(null);
+    setMostrarNuevaCategoriaRecordatorio(false);
+    setNombreNuevaCategoriaRecordatorio('');
   };
 
   const guardarRecordatorio = () => {
@@ -1247,10 +1480,12 @@ export default function OrganizApp() {
   };
 
   const resetearDatos = () => {
-    if (!window.confirm('¿Seguro? Esto borra tareas, carpetas, recordatorios, racha, historial y tu nombre (si tienes sincronización activa, también se borra en la nube). No hay vuelta atrás.')) return;
+    if (!window.confirm('¿Seguro? Esto borra tareas, etiquetas, recordatorios, notas, racha, historial y tu nombre (si tienes sincronización activa, también se borra en la nube). No hay vuelta atrás.')) return;
     setTareas([]);
     setCarpetas([]);
+    setCategorias(categoriasPorDefecto());
     setRecordatorios([]);
+    setNotas([]);
     setHistorial([]);
     setRacha(0);
     setMejorRacha(0);
@@ -1324,6 +1559,11 @@ export default function OrganizApp() {
     });
     return grupos;
   }, [recordatorios, hoy]);
+
+  const notasVisibles = useMemo(() => {
+    const filtradas = notaFiltroCategoria ? notas.filter(n => n.categoriaId === notaFiltroCategoria) : notas;
+    return [...filtradas].sort((a, b) => b.actualizado.localeCompare(a.actualizado));
+  }, [notas, notaFiltroCategoria]);
 
   const diasNoLibres = useMemo(() => historial.filter(h => !h.libre), [historial]);
   const porcentajeCumplimiento = diasNoLibres.length > 0
@@ -1432,6 +1672,13 @@ export default function OrganizApp() {
                 {recordatoriosPendientes}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('notas')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition
+              ${activeTab === 'notas' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <StickyNote className="w-4 h-4" /> Notas
           </button>
         </div>
 
@@ -1594,7 +1841,15 @@ export default function OrganizApp() {
                   </p>
                   <div className="space-y-2">
                     {lista.map(r => (
-                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} onEdit={abrirEditarRecordatorio} />
+                      <ReminderCard
+                        key={r.id}
+                        recordatorio={r}
+                        categoriaNombre={getCategoria(r.categoria)?.nombre}
+                        categoriaColorClass={getCategoriaColorClass(r.categoria)}
+                        onToggle={toggleRecordatorio}
+                        onDelete={eliminarRecordatorio}
+                        onEdit={abrirEditarRecordatorio}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1613,12 +1868,67 @@ export default function OrganizApp() {
                 {archivadosAbiertos && (
                   <div className="space-y-2 mt-2">
                     {recordatoriosArchivados.map(r => (
-                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} onEdit={abrirEditarRecordatorio} />
+                      <ReminderCard
+                        key={r.id}
+                        recordatorio={r}
+                        categoriaNombre={getCategoria(r.categoria)?.nombre}
+                        categoriaColorClass={getCategoriaColorClass(r.categoria)}
+                        onToggle={toggleRecordatorio}
+                        onDelete={eliminarRecordatorio}
+                        onEdit={abrirEditarRecordatorio}
+                      />
                     ))}
                   </div>
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'notas' && (
+          <div className="space-y-4">
+            {categorias.length > 0 && notas.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                <button
+                  onClick={() => setNotaFiltroCategoria(null)}
+                  className={`shrink-0 text-xs px-3 py-1.5 rounded-full border transition
+                    ${!notaFiltroCategoria ? 'bg-white/10 border-white/30 text-white' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                >
+                  Todas
+                </button>
+                {categorias.map((c, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setNotaFiltroCategoria(c.id)}
+                    className={`shrink-0 text-xs px-3 py-1.5 rounded-full border transition
+                      ${notaFiltroCategoria === c.id ? colorCategoria(i) + ' ring-1 ring-white/30' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                  >
+                    {c.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {notasVisibles.length === 0 && (
+              <p className="text-sm text-slate-500 text-center py-10">
+                {notas.length === 0
+                  ? 'No hay notas todavía. Anota algo antes de que se te olvide.'
+                  : 'No hay notas en esta categoría.'}
+              </p>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {notasVisibles.map(n => (
+                <NotaCard
+                  key={n.id}
+                  nota={n}
+                  categoriaNombre={getCategoria(n.categoriaId)?.nombre}
+                  categoriaColorClass={getCategoriaColorClass(n.categoriaId)}
+                  onEdit={abrirEditarNota}
+                  onDelete={eliminarNota}
+                />
+              ))}
+            </div>
           </div>
         )}
       </main>
@@ -1630,14 +1940,21 @@ export default function OrganizApp() {
         {showFabMenu && (
           <>
             <button
+              onClick={() => { abrirNuevaNota(); setShowFabMenu(false); }}
+              className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
+            >
+              Nota <StickyNote className="w-4 h-4 text-amber-300" />
+            </button>
+            <button
               onClick={() => { abrirNuevoRecordatorio(); setShowFabMenu(false); }}
+              style={{ animationDelay: '30ms' }}
               className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
             >
               Recordatorio <BellRing className="w-4 h-4 text-indigo-300" />
             </button>
             <button
               onClick={() => { abrirNuevaTarea(); setShowFabMenu(false); }}
-              style={{ animationDelay: '40ms' }}
+              style={{ animationDelay: '60ms' }}
               className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
             >
               Tarea <ListChecks className="w-4 h-4 text-emerald-300" />
@@ -1670,14 +1987,14 @@ export default function OrganizApp() {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">Carpeta (opcional)</label>
+              <label className="text-xs text-slate-400 mb-1.5 block">Etiqueta (opcional)</label>
               <div className="flex flex-wrap gap-1.5 items-center">
                 <button
                   onClick={() => setForm({ ...form, carpetaId: null })}
                   className={`text-xs px-2.5 py-1 rounded-full border transition
                     ${!form.carpetaId ? 'bg-white/15 border-white/30 text-white' : 'bg-white/5 text-slate-400 border-white/10'}`}
                 >
-                  Sin carpeta
+                  Sin etiqueta
                 </button>
                 {carpetas.map((c, i) => (
                   <button
@@ -1694,7 +2011,7 @@ export default function OrganizApp() {
                     onClick={() => setMostrarNuevaCarpeta(true)}
                     className="text-xs px-2.5 py-1 rounded-full border border-dashed border-white/20 text-slate-400 hover:text-slate-200"
                   >
-                    + Nueva carpeta
+                    + Nueva etiqueta
                   </button>
                 ) : (
                   <div className="flex items-center gap-1">
@@ -1794,17 +2111,40 @@ export default function OrganizApp() {
 
             <div>
               <label className="text-xs text-slate-400 mb-1.5 block">Categoría</label>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(CATEGORIAS).map(([key, info]) => (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {categorias.map((c, i) => (
                   <button
-                    key={key}
-                    onClick={() => setFormRecordatorio({ ...formRecordatorio, categoria: key })}
+                    key={c.id}
+                    onClick={() => setFormRecordatorio({ ...formRecordatorio, categoria: c.id })}
                     className={`text-xs px-2.5 py-1 rounded-full border transition
-                      ${formRecordatorio.categoria === key ? info.color + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                      ${formRecordatorio.categoria === c.id ? colorCategoria(i) + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
                   >
-                    {info.label}
+                    {c.nombre}
                   </button>
                 ))}
+                {!mostrarNuevaCategoriaRecordatorio ? (
+                  <button
+                    onClick={() => setMostrarNuevaCategoriaRecordatorio(true)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-white/20 text-slate-400 hover:text-slate-200"
+                  >
+                    + Nueva categoría
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={nombreNuevaCategoriaRecordatorio}
+                      onChange={e => setNombreNuevaCategoriaRecordatorio(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && confirmarNuevaCategoriaRecordatorio()}
+                      placeholder="Nombre"
+                      className="text-xs bg-white/5 border border-white/10 rounded-full px-2.5 py-1 outline-none w-28 focus:border-indigo-400/60"
+                    />
+                    <button onClick={confirmarNuevaCategoriaRecordatorio} className="text-emerald-400 shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1841,6 +2181,97 @@ export default function OrganizApp() {
             >
               {editingRecordatorioId ? 'Guardar cambios' : 'Agregar recordatorio'}
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {showNotaModal && (
+        <Modal titulo={editingNotaId ? 'Editar nota' : 'Nueva nota'} onClose={cerrarModalNota}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Título</label>
+              <input
+                autoFocus
+                type="text"
+                value={formNota.titulo}
+                onChange={e => setFormNota({ ...formNota, titulo: e.target.value })}
+                placeholder="Título de la nota"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Categoría (opcional)</label>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <button
+                  onClick={() => setFormNota({ ...formNota, categoriaId: null })}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition
+                    ${!formNota.categoriaId ? 'bg-white/15 border-white/30 text-white' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                >
+                  Sin categoría
+                </button>
+                {categorias.map((c, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setFormNota({ ...formNota, categoriaId: c.id })}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition
+                      ${formNota.categoriaId === c.id ? colorCategoria(i) + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                  >
+                    {c.nombre}
+                  </button>
+                ))}
+                {!mostrarNuevaCategoriaNota ? (
+                  <button
+                    onClick={() => setMostrarNuevaCategoriaNota(true)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-white/20 text-slate-400 hover:text-slate-200"
+                  >
+                    + Nueva categoría
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={nombreNuevaCategoriaNota}
+                      onChange={e => setNombreNuevaCategoriaNota(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && confirmarNuevaCategoriaNota()}
+                      placeholder="Nombre"
+                      className="text-xs bg-white/5 border border-white/10 rounded-full px-2.5 py-1 outline-none w-28 focus:border-indigo-400/60"
+                    />
+                    <button onClick={confirmarNuevaCategoriaNota} className="text-emerald-400 shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Contenido</label>
+              <NotaContentEditor
+                key={editingNotaId || 'nueva'}
+                initialValue={formNota.contenido}
+                onChange={html => setFormNota(prev => ({ ...prev, contenido: html }))}
+              />
+            </div>
+
+            <button
+              onClick={guardarNota}
+              disabled={!formNota.titulo.trim() && stripHtmlPreview(formNota.contenido).length === 0}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-sm
+                disabled:opacity-40 active:scale-[0.98] transition-transform"
+            >
+              {editingNotaId ? 'Guardar cambios' : 'Guardar nota'}
+            </button>
+
+            {editingNotaId && (
+              <button
+                onClick={() => { eliminarNota(editingNotaId); cerrarModalNota(); }}
+                className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium"
+              >
+                Eliminar nota
+              </button>
+            )}
           </div>
         </Modal>
       )}
@@ -2125,9 +2556,9 @@ export default function OrganizApp() {
             </div>
 
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
-              <p className="text-sm text-slate-300 font-medium">Carpetas de tareas</p>
+              <p className="text-sm text-slate-300 font-medium">Etiquetas de tareas</p>
               {carpetas.length === 0 && (
-                <p className="text-xs text-slate-600 italic">Aún no tienes carpetas. Crea la primera abajo.</p>
+                <p className="text-xs text-slate-600 italic">Aún no tienes etiquetas. Crea la primera abajo.</p>
               )}
               <div className="space-y-1">
                 {carpetas.map((c, i) => (
@@ -2152,10 +2583,10 @@ export default function OrganizApp() {
                     ) : (
                       <>
                         <span className="flex-1 min-w-0 truncate">{c.nombre}</span>
-                        <button onClick={() => iniciarEdicionCarpeta(c)} className="shrink-0 hover:text-white" aria-label="Editar carpeta">
+                        <button onClick={() => iniciarEdicionCarpeta(c)} className="shrink-0 hover:text-white" aria-label="Editar etiqueta">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => eliminarCarpeta(c.id)} className="shrink-0 hover:text-red-400" aria-label="Eliminar carpeta">
+                        <button onClick={() => eliminarCarpeta(c.id)} className="shrink-0 hover:text-red-400" aria-label="Eliminar etiqueta">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </>
@@ -2169,14 +2600,73 @@ export default function OrganizApp() {
                   value={nuevaCarpetaSettings}
                   onChange={e => setNuevaCarpetaSettings(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && agregarCarpetaSettings()}
-                  placeholder="Nombre de la nueva carpeta"
+                  placeholder="Nombre de la nueva etiqueta"
                   className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
                 />
                 <button
                   onClick={agregarCarpetaSettings}
                   disabled={!nuevaCarpetaSettings.trim()}
                   className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40 shrink-0"
-                  aria-label="Agregar carpeta"
+                  aria-label="Agregar etiqueta"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+              <p className="text-sm text-slate-300 font-medium">Categorías de recordatorios y notas</p>
+              {categorias.length === 0 && (
+                <p className="text-xs text-slate-600 italic">Aún no tienes categorías. Crea la primera abajo.</p>
+              )}
+              <div className="space-y-1">
+                {categorias.map((c, i) => (
+                  <div key={c.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 border ${colorCategoria(i)}`}>
+                    {categoriaEditandoId === c.id ? (
+                      <>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={categoriaEditandoNombre}
+                          onChange={e => setCategoriaEditandoNombre(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && guardarEdicionCategoria()}
+                          className="flex-1 min-w-0 bg-black/20 border border-white/20 rounded px-2 py-1 text-xs outline-none"
+                        />
+                        <button onClick={guardarEdicionCategoria} className="shrink-0 hover:text-emerald-300" aria-label="Guardar nombre">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={cancelarEdicionCategoria} className="shrink-0 hover:text-red-300" aria-label="Cancelar edición">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 min-w-0 truncate">{c.nombre}</span>
+                        <button onClick={() => iniciarEdicionCategoria(c)} className="shrink-0 hover:text-white" aria-label="Editar categoría">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => eliminarCategoria(c.id)} className="shrink-0 hover:text-red-400" aria-label="Eliminar categoría">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={nuevaCategoriaSettings}
+                  onChange={e => setNuevaCategoriaSettings(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && agregarCategoriaSettings()}
+                  placeholder="Nombre de la nueva categoría"
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                />
+                <button
+                  onClick={agregarCategoriaSettings}
+                  disabled={!nuevaCategoriaSettings.trim()}
+                  className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40 shrink-0"
+                  aria-label="Agregar categoría"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
