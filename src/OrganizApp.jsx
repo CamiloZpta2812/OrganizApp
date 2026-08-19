@@ -131,6 +131,8 @@ const MENSAJES_SAPO = [
 
 const MSG_ONBOARDING = '¡Hola! Soy S.A.P.O., Supervisor Autónomo para Procrastinadores Obligados. Alguien tenía que vigilar tu productividad, y adivina a quién le tocó. Bienvenido a OrganizApp: aquí organizamos tus pendientes, contamos tus rachas y, cuando haga falta, te lo restregamos en la cara. Antes de arrancar, dime algo: ¿cómo te llamas?';
 
+const MSG_ONBOARDING_AUTH = 'Antes de que sigas procrastinando, hagamos esto oficial: crea una cuenta o inicia sesión. Así, aunque cambies de celular, de computador o hasta de vida, tus pendientes te van a seguir encontrando.';
+
 const MSG_NOTIF_SAPO = [
   (t) => `S.A.P.O. reportando: "${t}" sigue pendiente. No fue una sugerencia.`,
   (t) => `Oye. "${t}". Sí, ahora. No después.`,
@@ -309,7 +311,11 @@ function SapoAvatar({ className }) {
   );
 }
 
-function SapoOnboardingScreen({ nombre, onNombreChange, onContinuar }) {
+function SapoOnboardingScreen({
+  step, nombre, onNombreChange, onContinuar,
+  authEmail, onAuthEmailChange, authPassword, onAuthPasswordChange,
+  authLoading, authError, authAviso, onCrearCuenta, onIniciarSesion, onOmitirAuth,
+}) {
   return (
     <div className="fixed inset-0 z-50 min-h-screen w-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 text-white overflow-y-auto">
       <style>{`
@@ -320,21 +326,69 @@ function SapoOnboardingScreen({ nombre, onNombreChange, onContinuar }) {
           <SapoAvatar className="w-28 h-28 mb-5" />
           <h1 className="text-xl font-bold text-emerald-300">S.A.P.O.</h1>
           <p className="text-xs text-slate-500 mt-1 mb-6">Supervisor Autónomo para Procrastinadores Obligados</p>
-          <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING}</p>
-          <input
-            autoFocus
-            type="text"
-            value={nombre}
-            onChange={e => onNombreChange(e.target.value)}
-            placeholder="Escribe tu nombre aquí..."
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-center outline-none focus:border-emerald-400/60"
-          />
-          <button
-            onClick={onContinuar}
-            className="w-full mt-4 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
-          >
-            {nombre.trim() ? `Encantado, ${nombre.trim()}` : 'Continuar'}
-          </button>
+
+          {step === 'auth' ? (
+            <>
+              <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING_AUTH}</p>
+              <input
+                autoFocus
+                type="email"
+                value={authEmail}
+                onChange={e => onAuthEmailChange(e.target.value)}
+                placeholder="Correo"
+                autoComplete="email"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-center outline-none focus:border-emerald-400/60"
+              />
+              <input
+                type="password"
+                value={authPassword}
+                onChange={e => onAuthPasswordChange(e.target.value)}
+                placeholder="Contraseña (mínimo 6 caracteres)"
+                autoComplete="current-password"
+                className="w-full mt-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-center outline-none focus:border-emerald-400/60"
+              />
+              {authError && <p className="text-xs text-red-400 mt-3">{authError}</p>}
+              {authAviso && <p className="text-xs text-emerald-400 mt-3">{authAviso}</p>}
+              <div className="w-full flex gap-2 mt-4">
+                <button
+                  onClick={onIniciarSesion}
+                  disabled={authLoading}
+                  className="flex-1 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  Iniciar sesión
+                </button>
+                <button
+                  onClick={onCrearCuenta}
+                  disabled={authLoading}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  Crear cuenta
+                </button>
+              </div>
+              <button onClick={onOmitirAuth} className="mt-5 text-xs text-slate-500 underline">
+                Seguir sin cuenta por ahora
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING}</p>
+              <input
+                autoFocus
+                type="text"
+                value={nombre}
+                onChange={e => onNombreChange(e.target.value)}
+                placeholder="Escribe tu nombre aquí..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-center outline-none focus:border-emerald-400/60"
+              />
+              <button
+                onClick={onContinuar}
+                className="w-full mt-4 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
+              >
+                {nombre.trim() ? `Encantado, ${nombre.trim()}` : 'Continuar'}
+              </button>
+            </>
+          )}
+
           <p className="text-[11px] text-slate-600 mt-8">OrganizApp · Productividad con actitud</p>
         </div>
       </div>
@@ -566,6 +620,7 @@ export default function OrganizApp() {
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [lastGreetingDate, setLastGreetingDate] = useState(saved.lastGreetingDate || '');
   const [onboardingCompleto, setOnboardingCompleto] = useState(saved.onboardingCompleto ?? yaTeniaDatos);
+  const [onboardingStep, setOnboardingStep] = useState(() => syncDisponible ? 'auth' : 'nombre');
   const [finDeSemanaLibre, setFinDeSemanaLibre] = useState(saved.finDeSemanaLibre ?? true);
   const [festivosManual, setFestivosManual] = useState(saved.festivosManual || []);
   const [horarioLaboral, setHorarioLaboral] = useState(saved.horarioLaboral || horarioLaboralPorDefecto());
@@ -910,6 +965,13 @@ export default function OrganizApp() {
     return () => { activo = false; cancelarSuscripcion(); };
   }, []);
 
+  // Durante el onboarding: en cuanto haya sesión (login/registro exitoso, o ya venía guardada), pasa al paso del nombre
+  useEffect(() => {
+    if (session && onboardingStep === 'auth') {
+      setOnboardingStep('nombre');
+    }
+  }, [session, onboardingStep]);
+
   const handleCrearCuenta = async () => {
     setAuthError('');
     setAuthAviso('');
@@ -1198,6 +1260,7 @@ export default function OrganizApp() {
     setShowGreetingPopup(false);
     setShowSettings(false);
     setOnboardingCompleto(false);
+    setOnboardingStep(syncDisponible ? 'auth' : 'nombre');
   };
 
   const hoy = hoyISO();
@@ -1274,9 +1337,20 @@ export default function OrganizApp() {
   if (!onboardingCompleto) {
     return (
       <SapoOnboardingScreen
+        step={onboardingStep}
         nombre={nombre}
         onNombreChange={setNombre}
         onContinuar={completarOnboarding}
+        authEmail={authEmail}
+        onAuthEmailChange={setAuthEmail}
+        authPassword={authPassword}
+        onAuthPasswordChange={setAuthPassword}
+        authLoading={authLoading}
+        authError={authError}
+        authAviso={authAviso}
+        onCrearCuenta={handleCrearCuenta}
+        onIniciarSesion={handleIniciarSesion}
+        onOmitirAuth={() => setOnboardingStep('nombre')}
       />
     );
   }
