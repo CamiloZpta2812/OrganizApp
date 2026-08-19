@@ -284,22 +284,6 @@ function guardarEstado(data) {
    SUBCOMPONENTES
    ============================================================ */
 
-function AppLogo({ className }) {
-  return (
-    <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="94" height="94" rx="24" fill="#ffffff" />
-      <circle
-        cx="42" cy="46" r="27" fill="none" stroke="#0f172a" strokeWidth="7"
-        strokeLinecap="round" strokeDasharray="139 30" transform="rotate(-45 42 46)"
-      />
-      <path d="M29 47 L39 57 L58 33" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="68" cy="61" r="5" fill="#22c55e" />
-      <circle cx="76" cy="70" r="4" fill="#4ade80" />
-      <circle cx="84" cy="77" r="3.5" fill="#a855f7" />
-    </svg>
-  );
-}
-
 function SapoAvatar({ className }) {
   return (
     <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -394,23 +378,26 @@ function SapoPopup({ message, onClose }) {
 
 function CoachToast({ mensaje }) {
   if (!mensaje) return null;
-  const estilos = {
-    exito: 'from-emerald-500/90 to-teal-500/90 border-emerald-400/50',
-    roast: 'from-rose-500/90 to-red-500/90 border-rose-400/50',
-    meta:  'from-amber-400/90 to-yellow-500/90 border-amber-300/50',
-    racha: 'from-slate-600/90 to-slate-700/90 border-slate-400/50',
+  const config = {
+    exito: { grad: 'from-emerald-500/95 to-teal-500/95 border-emerald-300/50', emoji: '🎉' },
+    roast: { grad: 'from-rose-500/95 to-red-500/95 border-rose-300/50', emoji: '😈' },
+    meta:  { grad: 'from-amber-400/95 to-orange-500/95 border-amber-200/50', emoji: '🏆' },
+    racha: { grad: 'from-slate-600/95 to-slate-800/95 border-slate-400/50', emoji: '💔' },
   };
+  const { grad, emoji } = config[mensaje.tipo] || config.exito;
   return (
-    <div
-      key={mensaje.id}
-      className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[92%] sm:max-w-md
-        px-4 py-3 rounded-2xl border backdrop-blur-md shadow-2xl
-        bg-gradient-to-br ${estilos[mensaje.tipo] || estilos.exito}
-        animate-[slideDown_0.35s_ease-out]`}
-    >
-      <p className="text-white text-sm font-medium text-center leading-snug">
-        {mensaje.texto}
-      </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-6 pointer-events-none">
+      <div
+        key={mensaje.id}
+        className={`pointer-events-auto max-w-xs sm:max-w-sm px-6 py-6 rounded-3xl border-2 backdrop-blur-md shadow-2xl text-center
+          bg-gradient-to-br ${grad}
+          animate-[coachPop_0.45s_cubic-bezier(0.34,1.56,0.64,1)_both]`}
+      >
+        <p className="text-5xl mb-2 animate-[coachBounce_0.7s_ease-in-out_0.15s_2]">{emoji}</p>
+        <p className="text-white text-base font-semibold leading-snug">
+          {mensaje.texto}
+        </p>
+      </div>
     </div>
   );
 }
@@ -632,7 +619,7 @@ export default function OrganizApp() {
 
   useEffect(() => {
     if (!coachMsg) return;
-    const t = setTimeout(() => setCoachMsg(null), 4200);
+    const t = setTimeout(() => setCoachMsg(null), 3000);
     return () => clearTimeout(t);
   }, [coachMsg]);
 
@@ -1142,7 +1129,8 @@ export default function OrganizApp() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       <style>{`
-        @keyframes slideDown { from { opacity:0; transform: translate(-50%, -12px);} to { opacity:1; transform: translate(-50%, 0);} }
+        @keyframes coachPop { 0% { opacity:0; transform: scale(0.7) translateY(12px);} 100% { opacity:1; transform: scale(1) translateY(0);} }
+        @keyframes coachBounce { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-10px);} }
         @keyframes slideUp { from { opacity:0; transform: translateY(24px);} to { opacity:1; transform: translateY(0);} }
         @keyframes popIn { from { opacity:0; transform: translateY(8px) scale(0.9);} to { opacity:1; transform: translateY(0) scale(1);} }
         @keyframes sapoPop { from { opacity:0; transform: scale(0.92);} to { opacity:1; transform: scale(1);} }
@@ -1157,7 +1145,7 @@ export default function OrganizApp() {
             className="flex items-center gap-2 text-left"
             aria-label="Escuchar a S.A.P.O"
           >
-            <AppLogo className="w-8 h-8 shrink-0" />
+            <SapoAvatar className="w-9 h-9 shrink-0" />
             <div>
               <h1 className="text-lg font-bold tracking-tight leading-none">OrganizApp</h1>
               <p className="text-[11px] text-slate-500 leading-none mt-0.5">Hola, {nombreMostrado}</p>
@@ -1711,6 +1699,12 @@ export default function OrganizApp() {
               </div>
             </div>
 
+            {completadoHoy > 0 && (
+              <p className="text-[11px] text-slate-500 -mt-2">
+                + {completadoHoy} pts de hoy, todavía sin confirmar (se suman cuando cierre el día).
+              </p>
+            )}
+
             {resumenSemanal.pendientesCount > 0 ? (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <p className="text-sm text-amber-200">
@@ -1742,6 +1736,18 @@ export default function OrganizApp() {
                 <p className="text-2xl font-bold text-white leading-none">{racha} {racha === 1 ? 'día' : 'días'}</p>
                 <p className="text-xs text-slate-400 mt-1.5">{mensajeRacha(racha)}</p>
               </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border ${progresoPct >= 100 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/10'}`}>
+              <p className="text-xs text-slate-400 mb-1">Hoy (aún sin confirmar)</p>
+              <p className="text-sm font-semibold text-slate-100">
+                {completadoHoy} / {metaPuntosHoy} pts {progresoPct >= 100 ? '✅ meta cumplida' : ''}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {progresoPct >= 100
+                  ? 'Si sigue así, este día suma a tu racha en cuanto cambie el día (no antes).'
+                  : 'La racha solo se actualiza al cerrar el día, no al instante.'}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
