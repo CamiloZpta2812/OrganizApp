@@ -17,3 +17,13 @@ body {
 input, select, textarea {
   font-size: 16px;
 }
+
+/* Los inputs nativos de fecha/hora en iOS a veces ignoran el ancho del contenedor
+   y se salen de la pantalla. Forzamos que respeten su caja. */
+input[type="date"],
+input[type="time"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

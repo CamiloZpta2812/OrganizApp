@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   CheckCircle2, Circle, Flame, Plus, X, Settings, Trash2, Clock,
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
-  Target, Sparkles, ListChecks, LayoutGrid, Award, ListOrdered,
-  CalendarClock, User, TrendingUp,
+  Target, ListChecks, LayoutGrid, Award, ListOrdered,
+  CalendarClock, User, TrendingUp, Archive, BarChart3,
 } from 'lucide-react';
 
 /* ============================================================
@@ -11,6 +11,7 @@ import {
    ============================================================ */
 const STORAGE_KEY = 'organizapp_data_v2';
 
+// Categorías: ahora solo aplican a los recordatorios (las tareas son siempre de trabajo)
 const CATEGORIAS = {
   trabajo:  { label: 'Trabajo',  color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
   salud:    { label: 'Salud',    color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
@@ -19,6 +20,19 @@ const CATEGORIAS = {
   personal: { label: 'Personal', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
   otro:     { label: 'Otro',     color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
 };
+
+// Paleta rotativa para las carpetas de tareas
+const CARPETA_COLORES = [
+  'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  'bg-pink-500/20 text-pink-300 border-pink-500/40',
+  'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+];
+function colorCarpeta(index) {
+  return CARPETA_COLORES[((index % CARPETA_COLORES.length) + CARPETA_COLORES.length) % CARPETA_COLORES.length];
+}
 
 const DURACIONES_RAPIDAS = [15, 30, 45, 60, 90, 120];
 
@@ -44,7 +58,25 @@ function getQuadrantByNivel(nivel) {
   return 'eliminar';
 }
 
-// Mensajes del "coach" ácido. {nombre} se reemplaza en tiempo real.
+const DIAS_GETDAY = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+const ORDEN_DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DIAS_LABELS = {
+  lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves',
+  viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
+};
+
+function horarioLaboralPorDefecto() {
+  return {
+    lunes:     { activo: true,  inicio: '08:00', fin: '17:30' },
+    martes:    { activo: true,  inicio: '08:00', fin: '17:30' },
+    miercoles: { activo: true,  inicio: '08:00', fin: '17:30' },
+    jueves:    { activo: true,  inicio: '08:00', fin: '17:30' },
+    viernes:   { activo: true,  inicio: '08:00', fin: '17:00' },
+    sabado:    { activo: false, inicio: '08:00', fin: '13:00' },
+    domingo:   { activo: false, inicio: '08:00', fin: '13:00' },
+  };
+}
+
 const MSG_COMPLETAR = [
   '¡Por fin hiciste algo útil hoy, {nombre}!',
   'Wow, sobreviviste a esta tarea. Que alguien te dé una medalla.',
@@ -82,7 +114,6 @@ const MSG_META_CUMPLIDA = [
   '¡Lo lograste, {nombre}! Guarda esta racha de buen comportamiento, no es común.',
 ];
 
-// Mensajes diarios de bienvenida de S.A.P.O
 const MENSAJES_SAPO = [
   'Buenos días, {nombre}. Aquí S.A.P.O., reportándome para vigilar que hoy no seas un desastre... otra vez.',
   '{nombre}, otro día, otra oportunidad de fingir que tienes todo bajo control.',
@@ -96,10 +127,8 @@ const MENSAJES_SAPO = [
   '{nombre}, si esto fuera un examen de productividad, ¿lo estarías pasando? Piensa rápido.',
 ];
 
-// Mensaje fijo de presentación (primera vez que se abre la app)
 const MSG_ONBOARDING = '¡Hola! Soy S.A.P.O., Supervisor Autónomo para Procrastinadores Obligados. Alguien tenía que vigilar tu productividad, y adivina a quién le tocó. Bienvenido a OrganizApp: aquí organizamos tus pendientes, contamos tus rachas y, cuando haga falta, te lo restregamos en la cara. Antes de arrancar, dime algo: ¿cómo te llamas?';
 
-// Frases de S.A.P.O para las notificaciones de recordatorios
 const MSG_NOTIF_SAPO = [
   (t) => `S.A.P.O. reportando: "${t}" sigue pendiente. No fue una sugerencia.`,
   (t) => `Oye. "${t}". Sí, ahora. No después.`,
@@ -107,12 +136,27 @@ const MSG_NOTIF_SAPO = [
   (t) => `"${t}" — o lo haces ya, o le sigues dando largas. Tú decides, yo solo aviso.`,
 ];
 
+const MSG_JORNADA_CUMPLIDA = [
+  'Última hora de la jornada, {nombre}, y ya cumpliste la meta de hoy. Milagro confirmado.',
+  'Con una hora por delante y la meta ya lista. Hoy sí te ganaste el sofá, {nombre}.',
+  'Meta cumplida antes de la última hora. S.A.P.O. está gratamente sorprendido, {nombre}.',
+];
+
+const MSG_JORNADA_PENDIENTE = [
+  'Última hora de la jornada, {nombre}, y todavía te faltan {faltan} pts. Se puede, pero hay que moverse.',
+  'Queda una hora y la meta sigue lejos, {nombre}. Faltan {faltan} pts, el reloj no perdona.',
+  '{nombre}, última hora del día y aún debes {faltan} pts. Ahora o nunca.',
+];
+
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function conNombre(texto, nombre) {
-  return texto.replace(/\{nombre\}/g, nombre);
+function formatMsg(texto, vars) {
+  return Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
+    texto
+  );
 }
 
 function hoyISO() {
@@ -166,13 +210,11 @@ function tipSugerencia(index, total) {
   return 'Sigue con esta. El sofá puede esperar un poco más.';
 }
 
-// ¿La fecha es sábado o domingo?
 function esFinDeSemana(fechaISO) {
   const dia = new Date(fechaISO + 'T00:00:00').getDay();
   return dia === 0 || dia === 6;
 }
 
-// ¿Ese día no debería afectar la racha? (fin de semana según configuración, o festivo manual)
 function esDiaLibre(fechaISO, finDeSemanaLibre, festivosManual) {
   if (festivosManual.includes(fechaISO)) return true;
   if (finDeSemanaLibre && esFinDeSemana(fechaISO)) return true;
@@ -186,6 +228,25 @@ function mensajeRacha(racha) {
   if (racha < 14) return 'Dos semanas casi. Empiezas a dar miedo, en el buen sentido.';
   if (racha < 30) return '¿Quién eres y qué hiciste con la persona procrastinadora de antes?';
   return 'Racha de leyenda. S.A.P.O. está oficialmente impresionado, y eso casi nunca pasa.';
+}
+
+function calcularAlertaJornada(horarioLaboral) {
+  const ahora = new Date();
+  const diaKey = DIAS_GETDAY[ahora.getDay()];
+  const horario = horarioLaboral[diaKey];
+  if (!horario || !horario.activo || !horario.fin) return null;
+  const [h, m] = horario.fin.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  const fin = new Date(ahora);
+  fin.setHours(h, m, 0, 0);
+  const alerta = new Date(fin.getTime() - 60 * 60000);
+  return `${String(alerta.getHours()).padStart(2, '0')}:${String(alerta.getMinutes()).padStart(2, '0')}`;
+}
+
+function ultimoDiaActivoSemana(horarioLaboral) {
+  const activos = ORDEN_DIAS.filter(d => horarioLaboral[d] && horarioLaboral[d].activo);
+  if (activos.length === 0) return null;
+  return activos[activos.length - 1];
 }
 
 /* ============================================================
@@ -214,7 +275,22 @@ function guardarEstado(data) {
    SUBCOMPONENTES
    ============================================================ */
 
-// Avatar original de S.A.P.O: un sapo con gafas de sol, dibujado en SVG
+function AppLogo({ className }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#818cf8" />
+          <stop offset="100%" stopColor="#a855f7" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#logoGrad)" />
+      <path d="M14 25l7 7 14-15" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="36.5" cy="12.5" r="6" fill="#fbbf24" />
+    </svg>
+  );
+}
+
 function SapoAvatar({ className }) {
   return (
     <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -238,7 +314,6 @@ function SapoAvatar({ className }) {
   );
 }
 
-// Pantalla completa de bienvenida de S.A.P.O (onboarding): tapa toda la app, no es un overlay
 function SapoOnboardingScreen({ nombre, onNombreChange, onContinuar }) {
   return (
     <div className="fixed inset-0 z-50 min-h-screen w-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 text-white overflow-y-auto">
@@ -272,7 +347,6 @@ function SapoOnboardingScreen({ nombre, onNombreChange, onContinuar }) {
   );
 }
 
-// Cuadro emergente centrado de S.A.P.O: para el saludo diario (o cuando lo invocas manualmente)
 function SapoPopup({ message, onClose }) {
   return (
     <div
@@ -309,7 +383,6 @@ function SapoPopup({ message, onClose }) {
   );
 }
 
-// Toast del "coach" sarcástico (mensajes cortos al completar/posponer tareas)
 function CoachToast({ mensaje }) {
   if (!mensaje) return null;
   const estilos = {
@@ -333,7 +406,6 @@ function CoachToast({ mensaje }) {
   );
 }
 
-// Badge de categoría
 function CategoriaBadge({ categoria }) {
   const info = CATEGORIAS[categoria] || CATEGORIAS.otro;
   return (
@@ -343,8 +415,16 @@ function CategoriaBadge({ categoria }) {
   );
 }
 
-// Tarjeta de una tarea individual
-function TaskCard({ tarea, onToggle, onDelete }) {
+function CarpetaBadge({ nombre, colorClass }) {
+  if (!nombre) return null;
+  return (
+    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${colorClass}`}>
+      {nombre}
+    </span>
+  );
+}
+
+function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete }) {
   const [recienCompletada, setRecienCompletada] = useState(false);
 
   const handleToggle = () => {
@@ -379,7 +459,7 @@ function TaskCard({ tarea, onToggle, onDelete }) {
           {tarea.titulo}
         </p>
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          <CategoriaBadge categoria={tarea.categoria} />
+          {carpetaNombre && <CarpetaBadge nombre={carpetaNombre} colorClass={carpetaColorClass} />}
           <span className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${NIVEL_BADGE[tarea.nivel] || NIVEL_BADGE[3]}`}>
             <Star className="w-3 h-3" /> P{tarea.nivel}
           </span>
@@ -403,7 +483,6 @@ function TaskCard({ tarea, onToggle, onDelete }) {
   );
 }
 
-// Tarjeta de un recordatorio individual
 function ReminderCard({ recordatorio, onToggle, onDelete }) {
   return (
     <div
@@ -428,6 +507,7 @@ function ReminderCard({ recordatorio, onToggle, onDelete }) {
           {recordatorio.titulo}
         </p>
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          <CategoriaBadge categoria={recordatorio.categoria} />
           <span className="flex items-center gap-1 text-[11px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full">
             <CalendarClock className="w-3 h-3" /> {formatFechaCorta(recordatorio.fecha)} · {recordatorio.hora}
           </span>
@@ -445,11 +525,10 @@ function ReminderCard({ recordatorio, onToggle, onDelete }) {
   );
 }
 
-// Modal genérico (centrado en desktop, hoja inferior en móvil)
 function Modal({ titulo, onClose, children }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto shadow-2xl animate-[slideUp_0.3s_ease-out]">
+      <div className="w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[slideUp_0.3s_ease-out]">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">{titulo}</h2>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/10 text-slate-400">
@@ -466,7 +545,6 @@ function Modal({ titulo, onClose, children }) {
    COMPONENTE PRINCIPAL
    ============================================================ */
 export default function OrganizApp() {
-  // --- Carga inicial (una sola vez) ---
   const initRef = useRef(null);
   if (initRef.current === null) {
     initRef.current = cargarEstado() || {};
@@ -476,8 +554,8 @@ export default function OrganizApp() {
     saved && ((saved.tareas && saved.tareas.length) || (saved.historial && saved.historial.length) || saved.nombre || saved.racha)
   );
 
-  // --- Estado de datos ---
   const [tareas, setTareas] = useState(saved.tareas || []);
+  const [carpetas, setCarpetas] = useState(saved.carpetas || []);
   const [recordatorios, setRecordatorios] = useState(saved.recordatorios || []);
   const [historial, setHistorial] = useState(saved.historial || []);
   const [racha, setRacha] = useState(saved.racha || 0);
@@ -489,14 +567,16 @@ export default function OrganizApp() {
   const [onboardingCompleto, setOnboardingCompleto] = useState(saved.onboardingCompleto ?? yaTeniaDatos);
   const [finDeSemanaLibre, setFinDeSemanaLibre] = useState(saved.finDeSemanaLibre ?? true);
   const [festivosManual, setFestivosManual] = useState(saved.festivosManual || []);
+  const [horarioLaboral, setHorarioLaboral] = useState(saved.horarioLaboral || horarioLaboralPorDefecto());
+  const [ultimaAlertaJornada, setUltimaAlertaJornada] = useState(saved.ultimaAlertaJornada || '');
 
   const [notifPermiso, setNotifPermiso] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
 
-  // --- Estado de UI ---
-  const [activeTab, setActiveTab] = useState('tareas'); // 'tareas' | 'recordatorios'
+  const [activeTab, setActiveTab] = useState('tareas');
   const [vistaLista, setVistaLista] = useState(false);
+  const [carpetaFiltro, setCarpetaFiltro] = useState(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddRecordatorio, setShowAddRecordatorio] = useState(false);
@@ -504,26 +584,33 @@ export default function OrganizApp() {
   const [showSugerencia, setShowSugerencia] = useState(false);
   const [showGreetingPopup, setShowGreetingPopup] = useState(false);
   const [showRachaInfo, setShowRachaInfo] = useState(false);
+  const [showRetomar, setShowRetomar] = useState(false);
+  const [showResumenSemanal, setShowResumenSemanal] = useState(false);
+  const [archivadosAbiertos, setArchivadosAbiertos] = useState(false);
   const [greetingMsg, setGreetingMsg] = useState('');
   const [coachMsg, setCoachMsg] = useState(null);
   const [nuevoFestivo, setNuevoFestivo] = useState('');
+  const [pendientesAyer, setPendientesAyer] = useState([]);
+  const [seleccionRetomar, setSeleccionRetomar] = useState({});
+  const [resumenSemanal, setResumenSemanal] = useState(null);
+  const [mostrarNuevaCarpeta, setMostrarNuevaCarpeta] = useState(false);
+  const [nombreNuevaCarpeta, setNombreNuevaCarpeta] = useState('');
   const [cuadrantesAbiertos, setCuadrantesAbiertos] = useState({
     hacer: true, programar: true, delegar: true, eliminar: true,
   });
 
   const [form, setForm] = useState({
-    titulo: '', categoria: 'trabajo', duracion: 30, nivel: 3,
+    titulo: '', carpetaId: null, duracion: 30, nivel: 3,
   });
 
   const [formRecordatorio, setFormRecordatorio] = useState({
-    titulo: '', fecha: hoyISO(), hora: '',
+    titulo: '', categoria: 'trabajo', fecha: hoyISO(), hora: '',
   });
 
   const nombreMostrado = nombre.trim() || 'Humano';
 
-  // --- Mostrar mensaje del coach con auto-dismiss ---
   const mostrarCoach = useCallback((texto, tipo) => {
-    setCoachMsg({ texto: conNombre(texto, nombreMostrado), tipo, id: Date.now() + Math.random() });
+    setCoachMsg({ texto: formatMsg(texto, { nombre: nombreMostrado }), tipo, id: Date.now() + Math.random() });
   }, [nombreMostrado]);
 
   useEffect(() => {
@@ -532,13 +619,10 @@ export default function OrganizApp() {
     return () => clearTimeout(t);
   }, [coachMsg]);
 
-  /* --------------------------------------------------------
-     S.A.P.O: saludo diario y onboarding inicial
-     -------------------------------------------------------- */
   const lanzarSaludoSiCorresponde = useCallback((forzar = false) => {
     const hoyStr = hoyISO();
     if (forzar || lastGreetingDate !== hoyStr) {
-      setGreetingMsg(conNombre(pickRandom(MENSAJES_SAPO), nombreMostrado));
+      setGreetingMsg(formatMsg(pickRandom(MENSAJES_SAPO), { nombre: nombreMostrado }));
       setShowGreetingPopup(true);
       if (!forzar) setLastGreetingDate(hoyStr);
     }
@@ -556,11 +640,11 @@ export default function OrganizApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* --------------------------------------------------------
-     CIERRE DE DÍA: evalúa racha (salvo días libres) y archiva tareas
-     -------------------------------------------------------- */
   const procesarCierreDia = useCallback((fechaAnterior, fechaNueva) => {
     const libre = esDiaLibre(fechaAnterior, finDeSemanaLibre, festivosManual);
+    const diaKeyAnterior = DIAS_GETDAY[new Date(fechaAnterior + 'T00:00:00').getDay()];
+    const ultimoDia = ultimoDiaActivoSemana(horarioLaboral);
+    const esUltimoDiaSemana = ultimoDia !== null && diaKeyAnterior === ultimoDia;
 
     setTareas(prevTareas => {
       const tareasDeAyer = prevTareas.filter(t => t.fecha === fechaAnterior);
@@ -569,12 +653,30 @@ export default function OrganizApp() {
       const metaAyer = totalAyer * metaPorcentaje / 100;
       const huboTareas = totalAyer > 0;
       const cumplida = huboTareas && completadoAyer >= metaAyer;
+      const pendientesAyerCalc = tareasDeAyer.filter(t => !t.completada);
 
       if (huboTareas) {
-        setHistorial(prevHist => [
-          ...prevHist,
-          { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida, libre },
-        ].slice(-90));
+        setHistorial(prevHist => {
+          const nuevoHistorial = [
+            ...prevHist,
+            { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida, libre },
+          ].slice(-90);
+
+          if (esUltimoDiaSemana) {
+            const ultimos7 = nuevoHistorial.slice(-7);
+            const puntosTotales = ultimos7.reduce((s, h) => s + h.puntosObtenidos, 0);
+            const diasCumplidos = ultimos7.filter(h => h.cumplida).length;
+            setResumenSemanal({
+              puntosTotales,
+              diasCumplidos,
+              diasTotal: ultimos7.length,
+              pendientesCount: pendientesAyerCalc.length,
+            });
+            setShowResumenSemanal(true);
+          }
+
+          return nuevoHistorial;
+        });
 
         if (!libre) {
           setRacha(prevRacha => {
@@ -589,13 +691,18 @@ export default function OrganizApp() {
         }
       }
 
+      if (pendientesAyerCalc.length > 0) {
+        setPendientesAyer(pendientesAyerCalc);
+        setSeleccionRetomar({});
+        if (!esUltimoDiaSemana) setShowRetomar(true);
+      }
+
       return prevTareas.filter(t => t.fecha !== fechaAnterior);
     });
 
     setLastActiveDate(fechaNueva);
-  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual]);
+  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual, horarioLaboral]);
 
-  // Revisa si cambió el día (cada minuto): cierre de día + saludo nuevo
   useEffect(() => {
     const check = () => {
       const hoyStr = hoyISO();
@@ -606,13 +713,11 @@ export default function OrganizApp() {
         lanzarSaludoSiCorresponde(false);
       }
     };
+    check();
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
   }, [lastActiveDate, lastGreetingDate, onboardingCompleto, procesarCierreDia, lanzarSaludoSiCorresponde]);
 
-  /* --------------------------------------------------------
-     NOTIFICACIONES DE S.A.P.O: revisa recordatorios cada 30s
-     -------------------------------------------------------- */
   useEffect(() => {
     const interval = setInterval(() => {
       if (notifPermiso !== 'granted') return;
@@ -640,25 +745,68 @@ export default function OrganizApp() {
     return () => clearInterval(interval);
   }, [notifPermiso]);
 
-  /* --------------------------------------------------------
-     PERSISTIR EN LOCALSTORAGE
-     -------------------------------------------------------- */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const hoyStr = hoyISO();
+      if (ultimaAlertaJornada === hoyStr) return;
+      const ahora = new Date();
+      const hhmm = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+      const alertaHHMM = calcularAlertaJornada(horarioLaboral);
+      if (!alertaHHMM || hhmm !== alertaHHMM) return;
+
+      const tareasHoyList = tareas.filter(t => t.fecha === hoyStr);
+      const totalHoy = tareasHoyList.reduce((s, t) => s + t.puntos, 0);
+      const completado = tareasHoyList.filter(t => t.completada).reduce((s, t) => s + t.puntos, 0);
+      const meta = totalHoy * metaPorcentaje / 100;
+      const cumplida = totalHoy > 0 && completado >= meta;
+
+      const msg = cumplida
+        ? formatMsg(pickRandom(MSG_JORNADA_CUMPLIDA), { nombre: nombreMostrado })
+        : formatMsg(pickRandom(MSG_JORNADA_PENDIENTE), { nombre: nombreMostrado, faltan: Math.max(Math.round(meta - completado), 0) });
+
+      setGreetingMsg(msg);
+      setShowGreetingPopup(true);
+      if (notifPermiso === 'granted') {
+        try {
+          new Notification('🐸 S.A.P.O. — última hora de la jornada', { body: msg });
+        } catch (e) { /* noop */ }
+      }
+      setUltimaAlertaJornada(hoyStr);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [horarioLaboral, tareas, metaPorcentaje, ultimaAlertaJornada, notifPermiso, nombreMostrado]);
+
   useEffect(() => {
     guardarEstado({
-      tareas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
+      tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
       lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
-      finDeSemanaLibre, festivosManual,
+      finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada,
     });
-  }, [tareas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
-      nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual]);
+  }, [tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
+      nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
+      horarioLaboral, ultimaAlertaJornada]);
 
-  /* --------------------------------------------------------
-     ACCIONES: notificaciones, tareas, recordatorios, festivos
-     -------------------------------------------------------- */
   const solicitarPermisoNotif = async () => {
     if (!('Notification' in window)) return;
     const p = await Notification.requestPermission();
     setNotifPermiso(p);
+  };
+
+  const confirmarNuevaCarpeta = () => {
+    const nombreLimpio = nombreNuevaCarpeta.trim();
+    if (!nombreLimpio) return;
+    const nueva = { id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, nombre: nombreLimpio };
+    setCarpetas(prev => [...prev, nueva]);
+    setForm(prev => ({ ...prev, carpetaId: nueva.id }));
+    setNombreNuevaCarpeta('');
+    setMostrarNuevaCarpeta(false);
+  };
+
+  const eliminarCarpeta = (id) => {
+    setCarpetas(prev => prev.filter(c => c.id !== id));
+    setTareas(prev => prev.map(t => t.carpetaId === id ? { ...t, carpetaId: null } : t));
+    if (carpetaFiltro === id) setCarpetaFiltro(null);
+    if (form.carpetaId === id) setForm(prev => ({ ...prev, carpetaId: null }));
   };
 
   const agregarTarea = () => {
@@ -666,7 +814,7 @@ export default function OrganizApp() {
     const nueva = {
       id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       titulo: form.titulo.trim(),
-      categoria: form.categoria,
+      carpetaId: form.carpetaId || null,
       duracion: Number(form.duracion) || 0,
       nivel: Number(form.nivel),
       puntos: calcularPuntos(form.duracion, form.nivel),
@@ -674,7 +822,7 @@ export default function OrganizApp() {
       completada: false,
     };
     setTareas(prev => [...prev, nueva]);
-    setForm({ titulo: '', categoria: 'trabajo', duracion: 30, nivel: 3 });
+    setForm({ titulo: '', carpetaId: null, duracion: 30, nivel: 3 });
     setShowAddModal(false);
   };
 
@@ -707,18 +855,45 @@ export default function OrganizApp() {
     setTareas(prev => prev.filter(t => t.id !== id));
   };
 
+  const copiarTareasRetomar = (lista) => {
+    const nuevas = lista.map(t => ({
+      ...t,
+      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      fecha: hoyISO(),
+      completada: false,
+    }));
+    setTareas(prev => [...prev, ...nuevas]);
+    setShowRetomar(false);
+    setPendientesAyer([]);
+    setSeleccionRetomar({});
+  };
+
+  const copiarSeleccionadasRetomar = () => {
+    const seleccionadas = pendientesAyer.filter(t => seleccionRetomar[t.id] ?? true);
+    copiarTareasRetomar(seleccionadas);
+  };
+
+  const copiarTodasRetomar = () => copiarTareasRetomar(pendientesAyer);
+
+  const descartarRetomar = () => {
+    setShowRetomar(false);
+    setPendientesAyer([]);
+    setSeleccionRetomar({});
+  };
+
   const agregarRecordatorio = () => {
     if (!formRecordatorio.titulo.trim()) return;
     const nuevo = {
       id: `r_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       titulo: formRecordatorio.titulo.trim(),
+      categoria: formRecordatorio.categoria,
       fecha: formRecordatorio.fecha || hoyISO(),
       hora: formRecordatorio.hora || '08:00',
       completado: false,
       notificado: false,
     };
     setRecordatorios(prev => [...prev, nuevo]);
-    setFormRecordatorio({ titulo: '', fecha: hoyISO(), hora: '' });
+    setFormRecordatorio({ titulo: '', categoria: 'trabajo', fecha: hoyISO(), hora: '' });
     setShowAddRecordatorio(false);
   };
 
@@ -740,9 +915,14 @@ export default function OrganizApp() {
     setFestivosManual(prev => prev.filter(f => f !== fecha));
   };
 
+  const actualizarHorarioDia = (dia, cambios) => {
+    setHorarioLaboral(prev => ({ ...prev, [dia]: { ...prev[dia], ...cambios } }));
+  };
+
   const resetearDatos = () => {
-    if (!window.confirm('¿Seguro? Esto borra tareas, recordatorios, racha, historial y tu nombre. Empiezas de cero, con S.A.P.O. y todo. No hay vuelta atrás.')) return;
+    if (!window.confirm('¿Seguro? Esto borra tareas, carpetas, recordatorios, racha, historial y tu nombre. Empiezas de cero, con S.A.P.O. y todo. No hay vuelta atrás.')) return;
     setTareas([]);
+    setCarpetas([]);
     setRecordatorios([]);
     setHistorial([]);
     setRacha(0);
@@ -755,9 +935,6 @@ export default function OrganizApp() {
     setOnboardingCompleto(false);
   };
 
-  /* --------------------------------------------------------
-     DATOS DERIVADOS: tareas
-     -------------------------------------------------------- */
   const hoy = hoyISO();
   const tareasHoy = useMemo(() => tareas.filter(t => t.fecha === hoy), [tareas, hoy]);
   const totalPuntosHoy = useMemo(() => tareasHoy.reduce((s, t) => s + t.puntos, 0), [tareasHoy]);
@@ -765,15 +942,26 @@ export default function OrganizApp() {
   const metaPuntosHoy = Math.round(totalPuntosHoy * metaPorcentaje / 100);
   const progresoPct = metaPuntosHoy > 0 ? Math.min(100, Math.round((completadoHoy / metaPuntosHoy) * 100)) : 0;
 
+  const tareasVisibles = useMemo(
+    () => carpetaFiltro ? tareasHoy.filter(t => t.carpetaId === carpetaFiltro) : tareasHoy,
+    [tareasHoy, carpetaFiltro]
+  );
+
   const tareasPorCuadrante = useMemo(() => {
     const grupos = { hacer: [], programar: [], delegar: [], eliminar: [] };
-    tareasHoy.forEach(t => {
+    tareasVisibles.forEach(t => {
       grupos[getQuadrantByNivel(t.nivel)].push(t);
     });
     return grupos;
-  }, [tareasHoy]);
+  }, [tareasVisibles]);
 
   const toggleCuadrante = (q) => setCuadrantesAbiertos(prev => ({ ...prev, [q]: !prev[q] }));
+
+  const getCarpeta = useCallback((id) => carpetas.find(c => c.id === id) || null, [carpetas]);
+  const getCarpetaColorClass = useCallback((id) => {
+    const i = carpetas.findIndex(c => c.id === id);
+    return i >= 0 ? colorCarpeta(i) : colorCarpeta(0);
+  }, [carpetas]);
 
   const ordenSugerido = useMemo(() => {
     const pendientes = tareasHoy.filter(t => !t.completada);
@@ -784,19 +972,23 @@ export default function OrganizApp() {
     });
   }, [tareasHoy]);
 
-  /* --------------------------------------------------------
-     DATOS DERIVADOS: recordatorios
-     -------------------------------------------------------- */
   const recordatoriosPendientes = useMemo(
     () => recordatorios.filter(r => !r.completado).length,
     [recordatorios]
   );
 
+  const recordatoriosArchivados = useMemo(
+    () => recordatorios.filter(r => r.completado),
+    [recordatorios]
+  );
+
   const recordatoriosPorGrupo = useMemo(() => {
-    const ordenados = [...recordatorios].sort((a, b) => {
-      const fa = `${a.fecha} ${a.hora}`;
-      const fb = `${b.fecha} ${b.hora}`;
-      return fa.localeCompare(fb);
+    const activos = recordatorios.filter(r => !r.completado);
+    const ordenados = [...activos].sort((a, b) => {
+      const pesoA = a.categoria === 'trabajo' ? 0 : 1;
+      const pesoB = b.categoria === 'trabajo' ? 0 : 1;
+      if (pesoA !== pesoB) return pesoA - pesoB;
+      return `${a.fecha} ${a.hora}`.localeCompare(`${b.fecha} ${b.hora}`);
     });
     const grupos = { Atrasados: [], Hoy: [], Mañana: [], Próximos: [] };
     ordenados.forEach(r => {
@@ -805,9 +997,6 @@ export default function OrganizApp() {
     return grupos;
   }, [recordatorios, hoy]);
 
-  /* --------------------------------------------------------
-     DATOS DERIVADOS: estadísticas de racha
-     -------------------------------------------------------- */
   const diasNoLibres = useMemo(() => historial.filter(h => !h.libre), [historial]);
   const porcentajeCumplimiento = diasNoLibres.length > 0
     ? Math.round((diasNoLibres.filter(h => h.cumplida).length / diasNoLibres.length) * 100)
@@ -817,11 +1006,6 @@ export default function OrganizApp() {
     return historial.reduce((max, h) => (!max || h.puntosObtenidos > max.puntosObtenidos) ? h : max, null);
   }, [historial]);
 
-  /* --------------------------------------------------------
-     RENDER
-     -------------------------------------------------------- */
-
-  // Onboarding: pantalla completa, tapa toda la app hasta que se complete
   if (!onboardingCompleto) {
     return (
       <SapoOnboardingScreen
@@ -843,7 +1027,6 @@ export default function OrganizApp() {
 
       <CoachToast mensaje={coachMsg} />
 
-      {/* HEADER */}
       <header className="sticky top-0 z-30 backdrop-blur-lg bg-slate-950/70 border-b border-white/5">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
@@ -851,7 +1034,7 @@ export default function OrganizApp() {
             className="flex items-center gap-2 text-left"
             aria-label="Escuchar a S.A.P.O"
           >
-            <Sparkles className="w-6 h-6 text-amber-400 shrink-0" />
+            <AppLogo className="w-8 h-8 shrink-0" />
             <div>
               <h1 className="text-lg font-bold tracking-tight leading-none">OrganizApp</h1>
               <p className="text-[11px] text-slate-500 leading-none mt-0.5">Hola, {nombreMostrado}</p>
@@ -880,7 +1063,6 @@ export default function OrganizApp() {
 
       <main className="max-w-3xl mx-auto px-4 pb-28 pt-4">
 
-        {/* TABS PRINCIPALES */}
         <div className="flex items-center gap-1 mb-4 bg-white/[0.03] p-1 rounded-2xl border border-white/5">
           <button
             onClick={() => setActiveTab('tareas')}
@@ -903,7 +1085,6 @@ export default function OrganizApp() {
           </button>
         </div>
 
-        {/* --------------------- VISTA: TAREAS --------------------- */}
         {activeTab === 'tareas' && (
           <>
             <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 mb-5">
@@ -930,6 +1111,28 @@ export default function OrganizApp() {
                     : `Te faltan ${Math.max(metaPuntosHoy - completadoHoy, 0)} pts. El sofá puede esperar.`}
               </p>
             </section>
+
+            {carpetas.length > 0 && (
+              <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
+                <button
+                  onClick={() => setCarpetaFiltro(null)}
+                  className={`shrink-0 text-xs px-3 py-1.5 rounded-full border transition
+                    ${!carpetaFiltro ? 'bg-white/10 border-white/30 text-white' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                >
+                  Todas
+                </button>
+                {carpetas.map((c, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCarpetaFiltro(c.id)}
+                    className={`shrink-0 text-xs px-3 py-1.5 rounded-full border transition
+                      ${carpetaFiltro === c.id ? colorCarpeta(i) + ' ring-1 ring-white/30' : 'bg-white/5 border-white/10 text-slate-400'}`}
+                  >
+                    {c.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
@@ -980,7 +1183,14 @@ export default function OrganizApp() {
                             <p className="text-xs text-slate-600 italic px-1 pb-1">Vacío. Sospechosamente vacío.</p>
                           )}
                           {lista.map(t => (
-                            <TaskCard key={t.id} tarea={t} onToggle={toggleCompletar} onDelete={eliminarTarea} />
+                            <TaskCard
+                              key={t.id}
+                              tarea={t}
+                              carpetaNombre={getCarpeta(t.carpetaId)?.nombre}
+                              carpetaColorClass={getCarpetaColorClass(t.carpetaId)}
+                              onToggle={toggleCompletar}
+                              onDelete={eliminarTarea}
+                            />
                           ))}
                         </div>
                       )}
@@ -992,23 +1202,29 @@ export default function OrganizApp() {
 
             {vistaLista && (
               <div className="space-y-2">
-                {tareasHoy.length === 0 && (
+                {tareasVisibles.length === 0 && (
                   <p className="text-sm text-slate-500 text-center py-10">
                     No hay tareas hoy. Aprovecha para inventar una excusa nueva.
                   </p>
                 )}
-                {tareasHoy
+                {tareasVisibles
                   .slice()
                   .sort((a, b) => (a.completada === b.completada ? 0 : a.completada ? 1 : -1))
                   .map(t => (
-                    <TaskCard key={t.id} tarea={t} onToggle={toggleCompletar} onDelete={eliminarTarea} />
+                    <TaskCard
+                      key={t.id}
+                      tarea={t}
+                      carpetaNombre={getCarpeta(t.carpetaId)?.nombre}
+                      carpetaColorClass={getCarpetaColorClass(t.carpetaId)}
+                      onToggle={toggleCompletar}
+                      onDelete={eliminarTarea}
+                    />
                   ))}
               </div>
             )}
           </>
         )}
 
-        {/* --------------------- VISTA: RECORDATORIOS --------------------- */}
         {activeTab === 'recordatorios' && (
           <div className="space-y-5">
             {recordatorios.length === 0 && (
@@ -1032,11 +1248,29 @@ export default function OrganizApp() {
                 </div>
               );
             })}
+
+            {recordatoriosArchivados.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setArchivadosAbiertos(v => !v)}
+                  className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 py-2 border-t border-white/5"
+                >
+                  <span className="flex items-center gap-1.5"><Archive className="w-3.5 h-3.5" /> Archivados ({recordatoriosArchivados.length})</span>
+                  {archivadosAbiertos ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+                {archivadosAbiertos && (
+                  <div className="space-y-2 mt-2">
+                    {recordatoriosArchivados.map(r => (
+                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* FAB CON MENÚ DESPLEGABLE */}
       {showFabMenu && (
         <div className="fixed inset-0 z-20" onClick={() => setShowFabMenu(false)} />
       )}
@@ -1069,7 +1303,6 @@ export default function OrganizApp() {
         </button>
       </div>
 
-      {/* MODAL AGREGAR TAREA */}
       {showAddModal && (
         <Modal titulo="Nueva tarea" onClose={() => setShowAddModal(false)}>
           <div className="space-y-4">
@@ -1085,18 +1318,48 @@ export default function OrganizApp() {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">Categoría</label>
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(CATEGORIAS).map(([key, info]) => (
+              <label className="text-xs text-slate-400 mb-1.5 block">Carpeta (opcional)</label>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <button
+                  onClick={() => setForm({ ...form, carpetaId: null })}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition
+                    ${!form.carpetaId ? 'bg-white/15 border-white/30 text-white' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                >
+                  Sin carpeta
+                </button>
+                {carpetas.map((c, i) => (
                   <button
-                    key={key}
-                    onClick={() => setForm({ ...form, categoria: key })}
+                    key={c.id}
+                    onClick={() => setForm({ ...form, carpetaId: c.id })}
                     className={`text-xs px-2.5 py-1 rounded-full border transition
-                      ${form.categoria === key ? info.color + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                      ${form.carpetaId === c.id ? colorCarpeta(i) + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
                   >
-                    {info.label}
+                    {c.nombre}
                   </button>
                 ))}
+                {!mostrarNuevaCarpeta ? (
+                  <button
+                    onClick={() => setMostrarNuevaCarpeta(true)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-white/20 text-slate-400 hover:text-slate-200"
+                  >
+                    + Nueva carpeta
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={nombreNuevaCarpeta}
+                      onChange={e => setNombreNuevaCarpeta(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && confirmarNuevaCarpeta()}
+                      placeholder="Nombre"
+                      className="text-xs bg-white/5 border border-white/10 rounded-full px-2.5 py-1 outline-none w-28 focus:border-indigo-400/60"
+                    />
+                    <button onClick={confirmarNuevaCarpeta} className="text-emerald-400 shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1163,7 +1426,6 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* MODAL AGREGAR RECORDATORIO */}
       {showAddRecordatorio && (
         <Modal titulo="Nuevo recordatorio" onClose={() => setShowAddRecordatorio(false)}>
           <div className="space-y-4">
@@ -1178,27 +1440,46 @@ export default function OrganizApp() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="min-w-0">
-                <label className="text-xs text-slate-400 mb-1 block">Fecha</label>
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Categoría</label>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(CATEGORIAS).map(([key, info]) => (
+                  <button
+                    key={key}
+                    onClick={() => setFormRecordatorio({ ...formRecordatorio, categoria: key })}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition
+                      ${formRecordatorio.categoria === key ? info.color + ' ring-1 ring-white/30' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                  >
+                    {info.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <label className="text-xs text-slate-400 mb-1 block">Fecha</label>
+              <div className="min-w-0 overflow-hidden rounded-xl">
                 <input
                   type="date"
                   value={formRecordatorio.fecha}
                   onChange={e => setFormRecordatorio({ ...formRecordatorio, fecha: e.target.value })}
-                  className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+                  className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
                 />
               </div>
-              <div className="min-w-0">
-                <label className="text-xs text-slate-400 mb-1 block">Hora (opcional)</label>
+            </div>
+
+            <div className="min-w-0">
+              <label className="text-xs text-slate-400 mb-1 block">Hora (opcional)</label>
+              <div className="min-w-0 overflow-hidden rounded-xl">
                 <input
                   type="time"
                   value={formRecordatorio.hora}
                   onChange={e => setFormRecordatorio({ ...formRecordatorio, hora: e.target.value })}
-                  className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+                  className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
                 />
               </div>
+              <p className="text-[11px] text-slate-500 mt-1.5">Si no eliges hora, se usa 8:00 a.m. por defecto.</p>
             </div>
-            <p className="text-[11px] text-slate-500 -mt-2">Si no eliges hora, se usa 8:00 a.m. por defecto.</p>
 
             <button
               onClick={agregarRecordatorio}
@@ -1212,7 +1493,6 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* MODAL ORDEN SUGERIDO */}
       {showSugerencia && (
         <Modal titulo="Orden sugerido de S.A.P.O" onClose={() => setShowSugerencia(false)}>
           {ordenSugerido.length === 0 ? (
@@ -1240,7 +1520,6 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* CUADRO EMERGENTE CENTRADO DE S.A.P.O (saludo diario, o al tocar el logo) */}
       {showGreetingPopup && (
         <SapoPopup
           message={greetingMsg}
@@ -1248,7 +1527,83 @@ export default function OrganizApp() {
         />
       )}
 
-      {/* MODAL DE ESTADÍSTICAS DE RACHA */}
+      {showRetomar && pendientesAyer.length > 0 && (
+        <Modal titulo="¿Retomamos algo de ayer?" onClose={descartarRetomar}>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Estas tareas quedaron sin hacer ayer. Elige cuáles traer a hoy, o descártalas sin culpa.
+            </p>
+            <div className="space-y-2">
+              {pendientesAyer.map(t => (
+                <label key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={seleccionRetomar[t.id] ?? true}
+                    onChange={e => setSeleccionRetomar(prev => ({ ...prev, [t.id]: e.target.checked }))}
+                    className="w-4 h-4 accent-indigo-500 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-100 break-words">{t.titulo}</p>
+                    <p className="text-[11px] text-slate-500">Prioridad {t.nivel}/5 · {formatDuracion(t.duracion)}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={descartarRetomar}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium"
+              >
+                Descartar todas
+              </button>
+              <button
+                onClick={copiarSeleccionadasRetomar}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
+              >
+                Copiar seleccionadas
+              </button>
+            </div>
+            <button onClick={copiarTodasRetomar} className="w-full text-xs text-indigo-300 underline text-center py-1">
+              Copiar todas sin revisar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showResumenSemanal && resumenSemanal && (
+        <Modal titulo="Resumen semanal" onClose={() => setShowResumenSemanal(false)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
+              <BarChart3 className="w-8 h-8 text-indigo-300 shrink-0" />
+              <div>
+                <p className="text-lg font-bold text-white leading-none">{resumenSemanal.puntosTotales} pts esta semana</p>
+                <p className="text-xs text-slate-400 mt-1.5">
+                  Cumpliste la meta {resumenSemanal.diasCumplidos} de {resumenSemanal.diasTotal} días registrados.
+                </p>
+              </div>
+            </div>
+
+            {resumenSemanal.pendientesCount > 0 ? (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <p className="text-sm text-amber-200">
+                  Te quedaron {resumenSemanal.pendientesCount} tarea{resumenSemanal.pendientesCount === 1 ? '' : 's'} sin hacer. La próxima semana empieza con esa deuda pendiente.
+                </p>
+                <button
+                  onClick={() => { setShowResumenSemanal(false); setShowRetomar(true); }}
+                  className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
+                >
+                  Revisar pendientes
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-emerald-300 text-center py-2">
+                Cerraste la semana sin nada pendiente. S.A.P.O. no tiene quejas (por ahora).
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+
       {showRachaInfo && (
         <Modal titulo="Tu racha" onClose={() => setShowRachaInfo(false)}>
           <div className="space-y-4">
@@ -1292,7 +1647,6 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* MODAL CONFIGURACIÓN */}
       {showSettings && (
         <Modal titulo="Configuración" onClose={() => setShowSettings(false)}>
           <div className="space-y-5">
@@ -1322,7 +1676,67 @@ export default function OrganizApp() {
               />
             </div>
 
-            {/* Días que no cuentan para la racha */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+              <p className="text-sm text-slate-300 font-medium">Carpetas de tareas</p>
+              {carpetas.length === 0 && (
+                <p className="text-xs text-slate-600 italic">Aún no tienes carpetas. Créalas al agregar una tarea.</p>
+              )}
+              <div className="space-y-1">
+                {carpetas.map((c, i) => (
+                  <div key={c.id} className={`flex items-center justify-between text-xs rounded-lg px-2.5 py-1.5 border ${colorCarpeta(i)}`}>
+                    <span>{c.nombre}</span>
+                    <button onClick={() => eliminarCarpeta(c.id)} className="hover:text-red-400">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
+              <p className="text-sm text-slate-300 font-medium">Horario laboral</p>
+              <p className="text-[11px] text-slate-500 mb-2">S.A.P.O. te avisa cuando falte 1 hora para terminar tu jornada.</p>
+              {ORDEN_DIAS.map(dia => {
+                const h = horarioLaboral[dia];
+                return (
+                  <div key={dia} className="py-2 border-b border-white/5 last:border-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-slate-300">{DIAS_LABELS[dia]}</span>
+                      <button
+                        onClick={() => actualizarHorarioDia(dia, { activo: !h.activo })}
+                        role="switch"
+                        aria-checked={h.activo}
+                        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${h.activo ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${h.activo ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                    {h.activo && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0 overflow-hidden rounded-lg">
+                          <input
+                            type="time"
+                            value={h.inicio}
+                            onChange={e => actualizarHorarioDia(dia, { inicio: e.target.value })}
+                            className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-indigo-400/60"
+                          />
+                        </div>
+                        <span className="text-slate-600 text-xs shrink-0">a</span>
+                        <div className="flex-1 min-w-0 overflow-hidden rounded-lg">
+                          <input
+                            type="time"
+                            value={h.fin}
+                            onChange={e => actualizarHorarioDia(dia, { fin: e.target.value })}
+                            className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-indigo-400/60"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-3">
               <p className="text-sm text-slate-300 font-medium">Días que no cuentan para la racha</p>
 
@@ -1344,16 +1758,18 @@ export default function OrganizApp() {
                   Festivos, incapacidades o vacaciones (no calculamos festivos colombianos automáticamente para no arriesgarnos a poner una fecha mal — agrega aquí cualquier día que no debería contar, sea festivo, incapacidad o vacaciones):
                 </p>
                 <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={nuevoFestivo}
-                    onChange={e => setNuevoFestivo(e.target.value)}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
-                  />
+                  <div className="flex-1 min-w-0 overflow-hidden rounded-lg">
+                    <input
+                      type="date"
+                      value={nuevoFestivo}
+                      onChange={e => setNuevoFestivo(e.target.value)}
+                      className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                    />
+                  </div>
                   <button
                     onClick={agregarFestivo}
                     disabled={!nuevoFestivo}
-                    className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40"
+                    className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40 shrink-0"
                     aria-label="Agregar festivo"
                   >
                     <Plus className="w-4 h-4" />
