@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   CheckCircle2, Circle, Flame, Plus, X, Settings, Trash2, Clock,
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
-  Target, Sparkles, ListChecks, LayoutGrid, Award, Bot, ListOrdered,
-  CalendarClock, User,
+  Target, Sparkles, ListChecks, LayoutGrid, Award, ListOrdered,
+  CalendarClock, User, TrendingUp,
 } from 'lucide-react';
 
 /* ============================================================
@@ -20,10 +20,8 @@ const CATEGORIAS = {
   otro:     { label: 'Otro',     color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
 };
 
-// Duraciones rápidas para elegir (en minutos)
 const DURACIONES_RAPIDAS = [15, 30, 45, 60, 90, 120];
 
-// Estilo del badge de prioridad según el nivel (1 a 5)
 const NIVEL_BADGE = {
   1: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
   2: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
@@ -32,7 +30,6 @@ const NIVEL_BADGE = {
   5: 'bg-red-500/15 text-red-300 border-red-500/30',
 };
 
-// Los 4 tableros de prioridad, derivados automáticamente del nivel de importancia
 const CUADRANTES_INFO = {
   hacer:     { label: 'Prioridad crítica', emoji: '🔥', desc: 'Nivel 5 — no hay excusa que valga', ring: 'border-red-500/40',    glow: 'shadow-red-500/10' },
   programar: { label: 'Alta prioridad',    emoji: '⚡', desc: 'Nivel 4 — pronto, no "luego"',      ring: 'border-orange-500/40', glow: 'shadow-orange-500/10' },
@@ -85,7 +82,7 @@ const MSG_META_CUMPLIDA = [
   '¡Lo lograste, {nombre}! Guarda esta racha de buen comportamiento, no es común.',
 ];
 
-// Mensajes diarios de bienvenida de S.A.P.O (Supervisor Autónomo para Procrastinadores Obligados)
+// Mensajes diarios de bienvenida de S.A.P.O
 const MENSAJES_SAPO = [
   'Buenos días, {nombre}. Aquí S.A.P.O., reportándome para vigilar que hoy no seas un desastre... otra vez.',
   '{nombre}, otro día, otra oportunidad de fingir que tienes todo bajo control.',
@@ -97,6 +94,17 @@ const MENSAJES_SAPO = [
   'S.A.P.O. al habla: hoy decide si eres productivo por convicción o por culpa. Ambas funcionan, {nombre}.',
   'Otro amanecer, {nombre}. Otra racha que puedes romper o mantener. Sin presión (mentira, sí hay presión).',
   '{nombre}, si esto fuera un examen de productividad, ¿lo estarías pasando? Piensa rápido.',
+];
+
+// Mensaje fijo de presentación (primera vez que se abre la app)
+const MSG_ONBOARDING = '¡Hola! Soy S.A.P.O., Supervisor Autónomo para Procrastinadores Obligados. Alguien tenía que vigilar tu productividad, y adivina a quién le tocó. Bienvenido a OrganizApp: aquí organizamos tus pendientes, contamos tus rachas y, cuando haga falta, te lo restregamos en la cara. Antes de arrancar, dime algo: ¿cómo te llamas?';
+
+// Frases de S.A.P.O para las notificaciones de recordatorios
+const MSG_NOTIF_SAPO = [
+  (t) => `S.A.P.O. reportando: "${t}" sigue pendiente. No fue una sugerencia.`,
+  (t) => `Oye. "${t}". Sí, ahora. No después.`,
+  (t) => `Recordatorio de S.A.P.O.: "${t}" no se va a resolver solo, por más que lo ignores.`,
+  (t) => `"${t}" — o lo haces ya, o le sigues dando largas. Tú decides, yo solo aviso.`,
 ];
 
 function pickRandom(arr) {
@@ -158,6 +166,28 @@ function tipSugerencia(index, total) {
   return 'Sigue con esta. El sofá puede esperar un poco más.';
 }
 
+// ¿La fecha es sábado o domingo?
+function esFinDeSemana(fechaISO) {
+  const dia = new Date(fechaISO + 'T00:00:00').getDay();
+  return dia === 0 || dia === 6;
+}
+
+// ¿Ese día no debería afectar la racha? (fin de semana según configuración, o festivo manual)
+function esDiaLibre(fechaISO, finDeSemanaLibre, festivosManual) {
+  if (festivosManual.includes(fechaISO)) return true;
+  if (finDeSemanaLibre && esFinDeSemana(fechaISO)) return true;
+  return false;
+}
+
+function mensajeRacha(racha) {
+  if (racha === 0) return 'Cero. Nada. Vacío existencial productivo.';
+  if (racha < 3) return 'Apenas arrancando. No cantes victoria todavía.';
+  if (racha < 7) return 'Ya casi una semana. Sigue así antes de que se te suba a la cabeza.';
+  if (racha < 14) return 'Dos semanas casi. Empiezas a dar miedo, en el buen sentido.';
+  if (racha < 30) return '¿Quién eres y qué hiciste con la persona procrastinadora de antes?';
+  return 'Racha de leyenda. S.A.P.O. está oficialmente impresionado, y eso casi nunca pasa.';
+}
+
 /* ============================================================
    PERSISTENCIA (localStorage)
    ============================================================ */
@@ -184,7 +214,83 @@ function guardarEstado(data) {
    SUBCOMPONENTES
    ============================================================ */
 
-// Toast del "coach" sarcástico
+// Avatar original de S.A.P.O: un sapo con gafas de sol, dibujado en SVG
+function SapoAvatar({ className }) {
+  return (
+    <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="60" rx="38" ry="30" fill="#22c55e" />
+      <circle cx="30" cy="31" r="15" fill="#22c55e" />
+      <circle cx="70" cy="31" r="15" fill="#22c55e" />
+      <circle cx="30" cy="31" r="8.5" fill="#f0fdf4" />
+      <circle cx="70" cy="31" r="8.5" fill="#f0fdf4" />
+      <rect x="12" y="26" width="34" height="14" rx="7" fill="#0f172a" />
+      <rect x="54" y="26" width="34" height="14" rx="7" fill="#0f172a" />
+      <rect x="44" y="30" width="12" height="4" fill="#0f172a" />
+      <circle cx="23" cy="31" r="2.4" fill="#e2e8f0" opacity="0.7" />
+      <circle cx="65" cy="31" r="2.4" fill="#e2e8f0" opacity="0.7" />
+      <circle cx="43" cy="57" r="2.2" fill="#065f46" />
+      <circle cx="57" cy="57" r="2.2" fill="#065f46" />
+      <path d="M35 68 Q50 78 65 66" stroke="#065f46" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+      <circle cx="22" cy="68" r="4.2" fill="#16a34a" opacity="0.6" />
+      <circle cx="78" cy="64" r="5.2" fill="#16a34a" opacity="0.6" />
+      <circle cx="50" cy="82" r="3" fill="#16a34a" opacity="0.5" />
+    </svg>
+  );
+}
+
+// Ventana flotante de S.A.P.O: sube desde abajo, para saludos diarios y onboarding
+function SapoSheet({ mode, message, nombre, onNombreChange, onPrimary, onClose }) {
+  const puedeCerrar = mode !== 'onboarding';
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+      onClick={puedeCerrar ? onClose : undefined}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border-t sm:border border-emerald-500/20 rounded-t-3xl sm:rounded-3xl p-5 pb-6 shadow-2xl animate-[sapoUp_0.45s_cubic-bezier(0.34,1.56,0.64,1)_both]"
+      >
+        <div className="w-10 h-1.5 rounded-full bg-white/15 mx-auto mb-4" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <SapoAvatar className="w-14 h-14 shrink-0" />
+            <div className="min-w-0 pt-0.5">
+              <p className="text-sm font-bold text-emerald-300 leading-none">S.A.P.O.</p>
+              <p className="text-[10px] text-slate-500 mt-1 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
+            </div>
+          </div>
+          {puedeCerrar && (
+            <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 text-slate-500 shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <p className="text-sm text-slate-200 leading-relaxed mt-3">{message}</p>
+
+        {mode === 'onboarding' && (
+          <input
+            autoFocus
+            type="text"
+            value={nombre}
+            onChange={e => onNombreChange(e.target.value)}
+            placeholder="Escribe tu nombre aquí..."
+            className="w-full mt-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-emerald-400/60"
+          />
+        )}
+
+        <button
+          onClick={onPrimary}
+          className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
+        >
+          {mode === 'onboarding' ? (nombre.trim() ? `Encantado, ${nombre.trim()}` : 'Continuar') : 'Ya, ya, entendido'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Toast del "coach" sarcástico (mensajes cortos al completar/posponer tareas)
 function CoachToast({ mensaje }) {
   if (!mensaje) return null;
   const estilos = {
@@ -320,7 +426,7 @@ function ReminderCard({ recordatorio, onToggle, onDelete }) {
   );
 }
 
-// Modal genérico
+// Modal genérico (centrado en desktop, hoja inferior en móvil)
 function Modal({ titulo, onClose, children }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
@@ -347,16 +453,23 @@ export default function OrganizApp() {
     initRef.current = cargarEstado() || {};
   }
   const saved = initRef.current;
+  const yaTeniaDatos = Boolean(
+    saved && ((saved.tareas && saved.tareas.length) || (saved.historial && saved.historial.length) || saved.nombre || saved.racha)
+  );
 
   // --- Estado de datos ---
   const [tareas, setTareas] = useState(saved.tareas || []);
   const [recordatorios, setRecordatorios] = useState(saved.recordatorios || []);
   const [historial, setHistorial] = useState(saved.historial || []);
   const [racha, setRacha] = useState(saved.racha || 0);
+  const [mejorRacha, setMejorRacha] = useState(saved.mejorRacha ?? saved.racha ?? 0);
   const [metaPorcentaje, setMetaPorcentaje] = useState(saved.metaPorcentaje ?? 70);
   const [lastActiveDate, setLastActiveDate] = useState(saved.lastActiveDate || hoyISO());
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [lastGreetingDate, setLastGreetingDate] = useState(saved.lastGreetingDate || '');
+  const [onboardingCompleto, setOnboardingCompleto] = useState(saved.onboardingCompleto ?? yaTeniaDatos);
+  const [finDeSemanaLibre, setFinDeSemanaLibre] = useState(saved.finDeSemanaLibre ?? true);
+  const [festivosManual, setFestivosManual] = useState(saved.festivosManual || []);
 
   const [notifPermiso, setNotifPermiso] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
@@ -371,8 +484,11 @@ export default function OrganizApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSugerencia, setShowSugerencia] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
+  const [showRachaInfo, setShowRachaInfo] = useState(false);
+  const [sapoMode, setSapoMode] = useState('greeting'); // 'greeting' | 'onboarding'
   const [greetingMsg, setGreetingMsg] = useState('');
   const [coachMsg, setCoachMsg] = useState(null);
+  const [nuevoFestivo, setNuevoFestivo] = useState('');
   const [cuadrantesAbiertos, setCuadrantesAbiertos] = useState({
     hacer: true, programar: true, delegar: true, eliminar: true,
   });
@@ -399,27 +515,41 @@ export default function OrganizApp() {
   }, [coachMsg]);
 
   /* --------------------------------------------------------
-     SALUDO DIARIO DE S.A.P.O
+     S.A.P.O: saludo diario y onboarding inicial
      -------------------------------------------------------- */
   const lanzarSaludoSiCorresponde = useCallback((forzar = false) => {
-    const hoy = hoyISO();
-    if (forzar || lastGreetingDate !== hoy) {
+    const hoyStr = hoyISO();
+    if (forzar || lastGreetingDate !== hoyStr) {
+      setSapoMode('greeting');
       setGreetingMsg(conNombre(pickRandom(MENSAJES_SAPO), nombreMostrado));
       setShowGreeting(true);
-      if (!forzar) setLastGreetingDate(hoy);
+      if (!forzar) setLastGreetingDate(hoyStr);
     }
   }, [lastGreetingDate, nombreMostrado]);
 
+  const completarOnboarding = () => {
+    setOnboardingCompleto(true);
+    setLastGreetingDate(hoyISO());
+    setShowGreeting(false);
+  };
+
   useEffect(() => {
-    // Al montar, revisa si toca saludo del día
-    lanzarSaludoSiCorresponde(false);
+    if (!onboardingCompleto) {
+      setSapoMode('onboarding');
+      setGreetingMsg(MSG_ONBOARDING);
+      setShowGreeting(true);
+    } else {
+      lanzarSaludoSiCorresponde(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* --------------------------------------------------------
-     CIERRE DE DÍA: evalúa racha y archiva tareas de ayer
+     CIERRE DE DÍA: evalúa racha (salvo días libres) y archiva tareas
      -------------------------------------------------------- */
   const procesarCierreDia = useCallback((fechaAnterior, fechaNueva) => {
+    const libre = esDiaLibre(fechaAnterior, finDeSemanaLibre, festivosManual);
+
     setTareas(prevTareas => {
       const tareasDeAyer = prevTareas.filter(t => t.fecha === fechaAnterior);
       const totalAyer = tareasDeAyer.reduce((s, t) => s + t.puntos, 0);
@@ -431,56 +561,61 @@ export default function OrganizApp() {
       if (huboTareas) {
         setHistorial(prevHist => [
           ...prevHist,
-          { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida },
+          { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida, libre },
         ].slice(-90));
 
-        setRacha(prevRacha => {
-          if (cumplida) return prevRacha + 1;
-          mostrarCoach(pickRandom(MSG_RACHA_PERDIDA), 'racha');
-          return 0;
-        });
+        if (!libre) {
+          setRacha(prevRacha => {
+            if (cumplida) {
+              const nueva = prevRacha + 1;
+              setMejorRacha(prevMejor => Math.max(prevMejor, nueva));
+              return nueva;
+            }
+            mostrarCoach(pickRandom(MSG_RACHA_PERDIDA), 'racha');
+            return 0;
+          });
+        }
       }
 
-      // Las tareas de ayer se archivan (se quitan de la lista activa)
       return prevTareas.filter(t => t.fecha !== fechaAnterior);
     });
 
     setLastActiveDate(fechaNueva);
-  }, [metaPorcentaje, mostrarCoach]);
+  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual]);
 
-  // Revisa si cambió el día (al montar y cada minuto): cierre de día + saludo nuevo
+  // Revisa si cambió el día (cada minuto): cierre de día + saludo nuevo
   useEffect(() => {
     const check = () => {
-      const hoy = hoyISO();
-      if (hoy !== lastActiveDate) {
-        procesarCierreDia(lastActiveDate, hoy);
+      const hoyStr = hoyISO();
+      if (hoyStr !== lastActiveDate) {
+        procesarCierreDia(lastActiveDate, hoyStr);
       }
-      if (hoy !== lastGreetingDate) {
+      if (onboardingCompleto && hoyStr !== lastGreetingDate) {
         lanzarSaludoSiCorresponde(false);
       }
     };
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
-  }, [lastActiveDate, lastGreetingDate, procesarCierreDia, lanzarSaludoSiCorresponde]);
+  }, [lastActiveDate, lastGreetingDate, onboardingCompleto, procesarCierreDia, lanzarSaludoSiCorresponde]);
 
   /* --------------------------------------------------------
-     NOTIFICACIONES: revisa recordatorios cada 30s
+     NOTIFICACIONES DE S.A.P.O: revisa recordatorios cada 30s
      -------------------------------------------------------- */
   useEffect(() => {
     const interval = setInterval(() => {
       if (notifPermiso !== 'granted') return;
       const ahora = new Date();
       const hhmm = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-      const hoy = hoyISO();
+      const hoyStr = hoyISO();
 
       setRecordatorios(prev => {
         let huboMatch = false;
         const actualizados = prev.map(r => {
-          if (r.fecha === hoy && r.hora === hhmm && !r.notificado && !r.completado) {
+          if (r.fecha === hoyStr && r.hora === hhmm && !r.notificado && !r.completado) {
             huboMatch = true;
             try {
-              new Notification('🔔 OrganizApp te recuerda', {
-                body: `"${r.titulo}" — o lo haces ahora, o le sigues dando largas.`,
+              new Notification('🐸 S.A.P.O. te recuerda', {
+                body: pickRandom(MSG_NOTIF_SAPO)(r.titulo),
               });
             } catch (e) { /* noop */ }
             return { ...r, notificado: true };
@@ -498,13 +633,15 @@ export default function OrganizApp() {
      -------------------------------------------------------- */
   useEffect(() => {
     guardarEstado({
-      tareas, recordatorios, historial, racha, metaPorcentaje,
-      lastActiveDate, nombre, lastGreetingDate,
+      tareas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
+      lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
+      finDeSemanaLibre, festivosManual,
     });
-  }, [tareas, recordatorios, historial, racha, metaPorcentaje, lastActiveDate, nombre, lastGreetingDate]);
+  }, [tareas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
+      nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual]);
 
   /* --------------------------------------------------------
-     ACCIONES: notificaciones, tareas, recordatorios
+     ACCIONES: notificaciones, tareas, recordatorios, festivos
      -------------------------------------------------------- */
   const solicitarPermisoNotif = async () => {
     if (!('Notification' in window)) return;
@@ -539,8 +676,8 @@ export default function OrganizApp() {
     if (seCompleta) {
       mostrarCoach(pickRandom(MSG_COMPLETAR), 'exito');
 
-      const hoy = hoyISO();
-      const tareasHoyList = nuevasTareas.filter(t => t.fecha === hoy);
+      const hoyStr = hoyISO();
+      const tareasHoyList = nuevasTareas.filter(t => t.fecha === hoyStr);
       const totalHoy = tareasHoyList.reduce((s, t) => s + t.puntos, 0);
       const completadoHoyPts = tareasHoyList.filter(t => t.completada).reduce((s, t) => s + t.puntos, 0);
       const metaHoy = totalHoy * metaPorcentaje / 100;
@@ -581,12 +718,23 @@ export default function OrganizApp() {
     setRecordatorios(prev => prev.filter(r => r.id !== id));
   };
 
+  const agregarFestivo = () => {
+    if (!nuevoFestivo) return;
+    setFestivosManual(prev => prev.includes(nuevoFestivo) ? prev : [...prev, nuevoFestivo].sort());
+    setNuevoFestivo('');
+  };
+
+  const quitarFestivo = (fecha) => {
+    setFestivosManual(prev => prev.filter(f => f !== fecha));
+  };
+
   const resetearDatos = () => {
     if (!window.confirm('¿Seguro? Esto borra tareas, recordatorios, racha e historial. No hay vuelta atrás.')) return;
     setTareas([]);
     setRecordatorios([]);
     setHistorial([]);
     setRacha(0);
+    setMejorRacha(0);
     setLastActiveDate(hoyISO());
     setShowSettings(false);
   };
@@ -611,7 +759,6 @@ export default function OrganizApp() {
 
   const toggleCuadrante = (q) => setCuadrantesAbiertos(prev => ({ ...prev, [q]: !prev[q] }));
 
-  // Orden sugerido: prioriza nivel alto, luego tareas más cortas como desempate
   const ordenSugerido = useMemo(() => {
     const pendientes = tareasHoy.filter(t => !t.completada);
     return [...pendientes].sort((a, b) => {
@@ -643,6 +790,18 @@ export default function OrganizApp() {
   }, [recordatorios, hoy]);
 
   /* --------------------------------------------------------
+     DATOS DERIVADOS: estadísticas de racha
+     -------------------------------------------------------- */
+  const diasNoLibres = useMemo(() => historial.filter(h => !h.libre), [historial]);
+  const porcentajeCumplimiento = diasNoLibres.length > 0
+    ? Math.round((diasNoLibres.filter(h => h.cumplida).length / diasNoLibres.length) * 100)
+    : 0;
+  const diaMasProductivo = useMemo(() => {
+    if (historial.length === 0) return null;
+    return historial.reduce((max, h) => (!max || h.puntosObtenidos > max.puntosObtenidos) ? h : max, null);
+  }, [historial]);
+
+  /* --------------------------------------------------------
      RENDER
      -------------------------------------------------------- */
   return (
@@ -651,6 +810,7 @@ export default function OrganizApp() {
         @keyframes slideDown { from { opacity:0; transform: translate(-50%, -12px);} to { opacity:1; transform: translate(-50%, 0);} }
         @keyframes slideUp { from { opacity:0; transform: translateY(24px);} to { opacity:1; transform: translateY(0);} }
         @keyframes popIn { from { opacity:0; transform: translateY(8px) scale(0.9);} to { opacity:1; transform: translateY(0) scale(1);} }
+        @keyframes sapoUp { from { opacity:0; transform: translateY(100%);} to { opacity:1; transform: translateY(0);} }
       `}</style>
 
       <CoachToast mensaje={coachMsg} />
@@ -670,11 +830,15 @@ export default function OrganizApp() {
             </div>
           </button>
           <div className="flex items-center gap-2">
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold
-              ${racha > 0 ? 'bg-orange-500/15 border-orange-500/30 text-orange-300' : 'bg-white/5 border-white/10 text-slate-400'}`}>
+            <button
+              onClick={() => setShowRachaInfo(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold transition active:scale-95
+                ${racha > 0 ? 'bg-orange-500/15 border-orange-500/30 text-orange-300 hover:bg-orange-500/25' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'}`}
+              aria-label="Ver detalles de tu racha"
+            >
               <Flame className={`w-4 h-4 ${racha > 0 ? 'text-orange-400' : 'text-slate-500'}`} />
               {racha}
-            </div>
+            </button>
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-full hover:bg-white/10 text-slate-300"
@@ -714,7 +878,6 @@ export default function OrganizApp() {
         {/* --------------------- VISTA: TAREAS --------------------- */}
         {activeTab === 'tareas' && (
           <>
-            {/* PROGRESO DEL DÍA */}
             <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 mb-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="flex items-center gap-1.5 text-sm font-medium text-slate-300">
@@ -740,7 +903,6 @@ export default function OrganizApp() {
               </p>
             </section>
 
-            {/* TOGGLE DE VISTA + SUGERENCIA */}
             <div className="flex items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <button
@@ -766,7 +928,6 @@ export default function OrganizApp() {
               </button>
             </div>
 
-            {/* VISTA TABLERO */}
             {!vistaLista && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.keys(CUADRANTES_INFO).map(q => {
@@ -801,7 +962,6 @@ export default function OrganizApp() {
               </div>
             )}
 
-            {/* VISTA LISTA */}
             {vistaLista && (
               <div className="space-y-2">
                 {tareasHoy.length === 0 && (
@@ -857,7 +1017,6 @@ export default function OrganizApp() {
           <>
             <button
               onClick={() => { setShowAddRecordatorio(true); setShowFabMenu(false); }}
-              style={{ animationDelay: '0ms' }}
               className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
             >
               Recordatorio <BellRing className="w-4 h-4 text-indigo-300" />
@@ -882,7 +1041,7 @@ export default function OrganizApp() {
         </button>
       </div>
 
-      {/* MODAL AGREGAR TAREA (simplificado) */}
+      {/* MODAL AGREGAR TAREA */}
       {showAddModal && (
         <Modal titulo="Nueva tarea" onClose={() => setShowAddModal(false)}>
           <div className="space-y-4">
@@ -1007,7 +1166,6 @@ export default function OrganizApp() {
                   type="time"
                   value={formRecordatorio.hora}
                   onChange={e => setFormRecordatorio({ ...formRecordatorio, hora: e.target.value })}
-                  placeholder="8:00 a.m. por defecto"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
                 />
               </div>
@@ -1054,22 +1212,58 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* MODAL SALUDO DIARIO DE S.A.P.O */}
+      {/* VENTANA FLOTANTE DE S.A.P.O (saludo diario u onboarding) */}
       {showGreeting && (
-        <Modal titulo="" onClose={() => setShowGreeting(false)}>
-          <div className="flex flex-col items-center text-center -mt-2">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-400/30 flex items-center justify-center mb-3">
-              <Bot className="w-8 h-8 text-emerald-300" />
+        <SapoSheet
+          mode={sapoMode}
+          message={greetingMsg}
+          nombre={nombre}
+          onNombreChange={setNombre}
+          onPrimary={sapoMode === 'onboarding' ? completarOnboarding : () => setShowGreeting(false)}
+          onClose={() => setShowGreeting(false)}
+        />
+      )}
+
+      {/* MODAL DE ESTADÍSTICAS DE RACHA */}
+      {showRachaInfo && (
+        <Modal titulo="Tu racha" onClose={() => setShowRachaInfo(false)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/30">
+              <Flame className="w-9 h-9 text-orange-400 shrink-0" />
+              <div>
+                <p className="text-2xl font-bold text-white leading-none">{racha} {racha === 1 ? 'día' : 'días'}</p>
+                <p className="text-xs text-slate-400 mt-1.5">{mensajeRacha(racha)}</p>
+              </div>
             </div>
-            <h3 className="text-base font-bold text-white">S.A.P.O.</h3>
-            <p className="text-[11px] text-slate-500 mb-4">Supervisor Autónomo para Procrastinadores Obligados</p>
-            <p className="text-sm text-slate-200 leading-relaxed">{greetingMsg}</p>
-            <button
-              onClick={() => setShowGreeting(false)}
-              className="mt-5 w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
-            >
-              Ya, ya, entendido
-            </button>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+                <p className="text-lg font-bold text-emerald-300">{mejorRacha}</p>
+                <p className="text-[11px] text-slate-500">Mejor racha</p>
+              </div>
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+                <p className="text-lg font-bold text-indigo-300">{porcentajeCumplimiento}%</p>
+                <p className="text-[11px] text-slate-500">Días cumplidos</p>
+              </div>
+            </div>
+
+            {diaMasProductivo && (
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3">
+                <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400">Tu día más productivo</p>
+                  <p className="text-sm font-semibold text-slate-100">
+                    {formatFechaCorta(diaMasProductivo.fecha)} · {diaMasProductivo.puntosObtenidos} pts
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-500 italic">
+              {finDeSemanaLibre
+                ? 'Los fines de semana no afectan tu racha (configuración activa).'
+                : 'Los fines de semana sí cuentan para tu racha. Puedes cambiar esto en Configuración.'}
+            </p>
           </div>
         </Modal>
       )}
@@ -1079,7 +1273,7 @@ export default function OrganizApp() {
         <Modal titulo="Configuración" onClose={() => setShowSettings(false)}>
           <div className="space-y-5">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block flex items-center gap-1.5">
+              <label className="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" /> Tu nombre
               </label>
               <input
@@ -1102,6 +1296,56 @@ export default function OrganizApp() {
                 onChange={e => setMetaPorcentaje(Number(e.target.value))}
                 className="w-full accent-indigo-500"
               />
+            </div>
+
+            {/* Días que no cuentan para la racha */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-3">
+              <p className="text-sm text-slate-300 font-medium">Días que no cuentan para la racha</p>
+
+              <button
+                onClick={() => setFinDeSemanaLibre(v => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-xs font-medium transition
+                  ${finDeSemanaLibre ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-white/5 border-white/10 text-slate-400'}`}
+              >
+                Fines de semana no cuentan
+                <span className={`w-9 h-5 rounded-full relative transition-colors ${finDeSemanaLibre ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${finDeSemanaLibre ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </span>
+              </button>
+
+              <div>
+                <p className="text-[11px] text-slate-500 mb-1.5">
+                  Festivos manuales (no calculamos festivos colombianos automáticamente para no arriesgarnos a poner una fecha mal — agrégalos tú):
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={nuevoFestivo}
+                    onChange={e => setNuevoFestivo(e.target.value)}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                  />
+                  <button
+                    onClick={agregarFestivo}
+                    disabled={!nuevoFestivo}
+                    className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40"
+                    aria-label="Agregar festivo"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {festivosManual.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
+                    {festivosManual.map(f => (
+                      <div key={f} className="flex items-center justify-between text-xs bg-white/5 rounded-lg px-2.5 py-1.5">
+                        <span className="text-slate-300">{formatFechaCorta(f)}</span>
+                        <button onClick={() => quitarFestivo(f)} className="text-slate-500 hover:text-red-400">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-3 rounded-xl bg-white/5 border border-white/10">
@@ -1132,7 +1376,7 @@ export default function OrganizApp() {
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {historial.slice(-7).reverse().map(h => (
                   <div key={h.fecha} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">{h.fecha}</span>
+                    <span className="text-slate-500">{h.fecha}{h.libre ? ' (libre)' : ''}</span>
                     <span className={h.cumplida ? 'text-emerald-400' : 'text-red-400'}>
                       {h.puntosObtenidos}/{h.puntosMeta} pts {h.cumplida ? '✅' : '❌'}
                     </span>
