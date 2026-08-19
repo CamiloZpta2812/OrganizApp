@@ -3,7 +3,7 @@ import {
   CheckCircle2, Circle, Flame, Plus, X, Settings, Trash2, Clock,
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
   Target, ListChecks, LayoutGrid, Award, ListOrdered,
-  CalendarClock, User, TrendingUp, Archive, BarChart3,
+  CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
 } from 'lucide-react';
 
 /* ============================================================
@@ -249,6 +249,15 @@ function ultimoDiaActivoSemana(horarioLaboral) {
   return activos[activos.length - 1];
 }
 
+// Devuelve el lunes (YYYY-MM-DD) de la semana a la que pertenece fechaISO
+function lunesDeLaSemana(fechaISO) {
+  const d = new Date(fechaISO + 'T00:00:00');
+  const dia = d.getDay(); // 0=domingo..6=sábado
+  const offsetALunes = dia === 0 ? -6 : 1 - dia;
+  d.setDate(d.getDate() + offsetALunes);
+  return d.toISOString().split('T')[0];
+}
+
 /* ============================================================
    PERSISTENCIA (localStorage)
    ============================================================ */
@@ -277,16 +286,16 @@ function guardarEstado(data) {
 
 function AppLogo({ className }) {
   return (
-    <svg viewBox="0 0 48 48" className={className} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#818cf8" />
-          <stop offset="100%" stopColor="#a855f7" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="44" height="44" rx="13" fill="url(#logoGrad)" />
-      <path d="M14 25l7 7 14-15" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="36.5" cy="12.5" r="6" fill="#fbbf24" />
+    <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="94" height="94" rx="24" fill="#ffffff" />
+      <circle
+        cx="42" cy="46" r="27" fill="none" stroke="#0f172a" strokeWidth="7"
+        strokeLinecap="round" strokeDasharray="139 30" transform="rotate(-45 42 46)"
+      />
+      <path d="M29 47 L39 57 L58 33" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="68" cy="61" r="5" fill="#22c55e" />
+      <circle cx="76" cy="70" r="4" fill="#4ade80" />
+      <circle cx="84" cy="77" r="3.5" fill="#a855f7" />
     </svg>
   );
 }
@@ -424,10 +433,11 @@ function CarpetaBadge({ nombre, colorClass }) {
   );
 }
 
-function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete }) {
+function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete, onEdit }) {
   const [recienCompletada, setRecienCompletada] = useState(false);
 
-  const handleToggle = () => {
+  const handleToggle = (e) => {
+    e.stopPropagation();
     if (!tarea.completada) {
       setRecienCompletada(true);
       setTimeout(() => setRecienCompletada(false), 700);
@@ -437,7 +447,8 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete 
 
   return (
     <div
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300
+      onClick={() => onEdit(tarea)}
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer
         ${tarea.completada
           ? 'bg-white/[0.03] border-white/5 opacity-60'
           : 'bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09]'}
@@ -473,7 +484,7 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete 
       </div>
 
       <button
-        onClick={() => onDelete(tarea.id)}
+        onClick={(e) => { e.stopPropagation(); onDelete(tarea.id); }}
         className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
         aria-label="Eliminar tarea"
       >
@@ -483,17 +494,18 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete 
   );
 }
 
-function ReminderCard({ recordatorio, onToggle, onDelete }) {
+function ReminderCard({ recordatorio, onToggle, onDelete, onEdit }) {
   return (
     <div
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300
+      onClick={() => onEdit(recordatorio)}
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer
         ${recordatorio.completado
           ? 'bg-white/[0.03] border-white/5 opacity-60'
           : 'bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09]'}
       `}
     >
       <button
-        onClick={() => onToggle(recordatorio.id)}
+        onClick={(e) => { e.stopPropagation(); onToggle(recordatorio.id); }}
         className="mt-0.5 shrink-0 transition-transform duration-200 active:scale-90"
         aria-label="Marcar recordatorio hecho"
       >
@@ -515,7 +527,7 @@ function ReminderCard({ recordatorio, onToggle, onDelete }) {
       </div>
 
       <button
-        onClick={() => onDelete(recordatorio.id)}
+        onClick={(e) => { e.stopPropagation(); onDelete(recordatorio.id); }}
         className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
         aria-label="Eliminar recordatorio"
       >
@@ -592,9 +604,14 @@ export default function OrganizApp() {
   const [nuevoFestivo, setNuevoFestivo] = useState('');
   const [pendientesAyer, setPendientesAyer] = useState([]);
   const [seleccionRetomar, setSeleccionRetomar] = useState({});
-  const [resumenSemanal, setResumenSemanal] = useState(null);
+  const [resumenSemanal, setResumenSemanal] = useState(saved.resumenSemanal || null);
   const [mostrarNuevaCarpeta, setMostrarNuevaCarpeta] = useState(false);
   const [nombreNuevaCarpeta, setNombreNuevaCarpeta] = useState('');
+  const [nuevaCarpetaSettings, setNuevaCarpetaSettings] = useState('');
+  const [carpetaEditandoId, setCarpetaEditandoId] = useState(null);
+  const [carpetaEditandoNombre, setCarpetaEditandoNombre] = useState('');
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingRecordatorioId, setEditingRecordatorioId] = useState(null);
   const [cuadrantesAbiertos, setCuadrantesAbiertos] = useState({
     hacer: true, programar: true, delegar: true, eliminar: true,
   });
@@ -661,20 +678,6 @@ export default function OrganizApp() {
             ...prevHist,
             { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida, libre },
           ].slice(-90);
-
-          if (esUltimoDiaSemana) {
-            const ultimos7 = nuevoHistorial.slice(-7);
-            const puntosTotales = ultimos7.reduce((s, h) => s + h.puntosObtenidos, 0);
-            const diasCumplidos = ultimos7.filter(h => h.cumplida).length;
-            setResumenSemanal({
-              puntosTotales,
-              diasCumplidos,
-              diasTotal: ultimos7.length,
-              pendientesCount: pendientesAyerCalc.length,
-            });
-            setShowResumenSemanal(true);
-          }
-
           return nuevoHistorial;
         });
 
@@ -690,6 +693,34 @@ export default function OrganizApp() {
           });
         }
       }
+
+      // Resumen semanal: se acumula día a día (lunes a domingo) y se reinicia al empezar el lunes
+      setResumenSemanal(prevResumen => {
+        const lunesAnterior = lunesDeLaSemana(fechaAnterior);
+        const base = (prevResumen && prevResumen.semanaInicio === lunesAnterior)
+          ? prevResumen
+          : { semanaInicio: lunesAnterior, puntosTotales: 0, diasCumplidos: 0, diasTotal: 0, pendientesCount: 0 };
+
+        const finalizado = huboTareas
+          ? {
+              semanaInicio: lunesAnterior,
+              puntosTotales: base.puntosTotales + completadoAyer,
+              diasCumplidos: base.diasCumplidos + (cumplida ? 1 : 0),
+              diasTotal: base.diasTotal + 1,
+              pendientesCount: pendientesAyerCalc.length,
+            }
+          : { ...base, pendientesCount: pendientesAyerCalc.length };
+
+        if (esUltimoDiaSemana) {
+          setShowResumenSemanal(true);
+        }
+
+        // Si el nuevo día es lunes, arrancamos en ceros la semana que empieza hoy
+        const nuevaEsLunes = DIAS_GETDAY[new Date(fechaNueva + 'T00:00:00').getDay()] === 'lunes';
+        return nuevaEsLunes
+          ? { semanaInicio: fechaNueva, puntosTotales: 0, diasCumplidos: 0, diasTotal: 0, pendientesCount: 0 }
+          : finalizado;
+      });
 
       if (pendientesAyerCalc.length > 0) {
         setPendientesAyer(pendientesAyerCalc);
@@ -780,11 +811,11 @@ export default function OrganizApp() {
     guardarEstado({
       tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
       lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
-      finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada,
+      finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada, resumenSemanal,
     });
   }, [tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
       nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
-      horarioLaboral, ultimaAlertaJornada]);
+      horarioLaboral, ultimaAlertaJornada, resumenSemanal]);
 
   const solicitarPermisoNotif = async () => {
     if (!('Notification' in window)) return;
@@ -802,28 +833,88 @@ export default function OrganizApp() {
     setMostrarNuevaCarpeta(false);
   };
 
+  const agregarCarpetaSettings = () => {
+    const nombreLimpio = nuevaCarpetaSettings.trim();
+    if (!nombreLimpio) return;
+    setCarpetas(prev => [...prev, { id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, nombre: nombreLimpio }]);
+    setNuevaCarpetaSettings('');
+  };
+
+  const iniciarEdicionCarpeta = (c) => {
+    setCarpetaEditandoId(c.id);
+    setCarpetaEditandoNombre(c.nombre);
+  };
+
+  const guardarEdicionCarpeta = () => {
+    const nombreLimpio = carpetaEditandoNombre.trim();
+    if (!nombreLimpio) return;
+    setCarpetas(prev => prev.map(c => c.id === carpetaEditandoId ? { ...c, nombre: nombreLimpio } : c));
+    setCarpetaEditandoId(null);
+    setCarpetaEditandoNombre('');
+  };
+
+  const cancelarEdicionCarpeta = () => {
+    setCarpetaEditandoId(null);
+    setCarpetaEditandoNombre('');
+  };
+
   const eliminarCarpeta = (id) => {
     setCarpetas(prev => prev.filter(c => c.id !== id));
     setTareas(prev => prev.map(t => t.carpetaId === id ? { ...t, carpetaId: null } : t));
     if (carpetaFiltro === id) setCarpetaFiltro(null);
     if (form.carpetaId === id) setForm(prev => ({ ...prev, carpetaId: null }));
+    if (carpetaEditandoId === id) cancelarEdicionCarpeta();
   };
 
-  const agregarTarea = () => {
-    if (!form.titulo.trim()) return;
-    const nueva = {
-      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      titulo: form.titulo.trim(),
-      carpetaId: form.carpetaId || null,
-      duracion: Number(form.duracion) || 0,
-      nivel: Number(form.nivel),
-      puntos: calcularPuntos(form.duracion, form.nivel),
-      fecha: hoyISO(),
-      completada: false,
-    };
-    setTareas(prev => [...prev, nueva]);
+  const abrirNuevaTarea = () => {
     setForm({ titulo: '', carpetaId: null, duracion: 30, nivel: 3 });
+    setEditingTaskId(null);
+    setShowAddModal(true);
+  };
+
+  const abrirEditarTarea = (tarea) => {
+    setForm({
+      titulo: tarea.titulo,
+      carpetaId: tarea.carpetaId || null,
+      duracion: tarea.duracion,
+      nivel: tarea.nivel,
+    });
+    setEditingTaskId(tarea.id);
+    setShowAddModal(true);
+  };
+
+  const cerrarModalTarea = () => {
     setShowAddModal(false);
+    setEditingTaskId(null);
+    setMostrarNuevaCarpeta(false);
+    setNombreNuevaCarpeta('');
+  };
+
+  const guardarTarea = () => {
+    if (!form.titulo.trim()) return;
+    if (editingTaskId) {
+      setTareas(prev => prev.map(t => t.id === editingTaskId ? {
+        ...t,
+        titulo: form.titulo.trim(),
+        carpetaId: form.carpetaId || null,
+        duracion: Number(form.duracion) || 0,
+        nivel: Number(form.nivel),
+        puntos: calcularPuntos(form.duracion, form.nivel),
+      } : t));
+    } else {
+      const nueva = {
+        id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        titulo: form.titulo.trim(),
+        carpetaId: form.carpetaId || null,
+        duracion: Number(form.duracion) || 0,
+        nivel: Number(form.nivel),
+        puntos: calcularPuntos(form.duracion, form.nivel),
+        fecha: hoyISO(),
+        completada: false,
+      };
+      setTareas(prev => [...prev, nueva]);
+    }
+    cerrarModalTarea();
   };
 
   const toggleCompletar = (id) => {
@@ -881,20 +972,52 @@ export default function OrganizApp() {
     setSeleccionRetomar({});
   };
 
-  const agregarRecordatorio = () => {
-    if (!formRecordatorio.titulo.trim()) return;
-    const nuevo = {
-      id: `r_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      titulo: formRecordatorio.titulo.trim(),
-      categoria: formRecordatorio.categoria,
-      fecha: formRecordatorio.fecha || hoyISO(),
-      hora: formRecordatorio.hora || '08:00',
-      completado: false,
-      notificado: false,
-    };
-    setRecordatorios(prev => [...prev, nuevo]);
+  const abrirNuevoRecordatorio = () => {
     setFormRecordatorio({ titulo: '', categoria: 'trabajo', fecha: hoyISO(), hora: '' });
+    setEditingRecordatorioId(null);
+    setShowAddRecordatorio(true);
+  };
+
+  const abrirEditarRecordatorio = (r) => {
+    setFormRecordatorio({
+      titulo: r.titulo,
+      categoria: r.categoria,
+      fecha: r.fecha,
+      hora: r.hora,
+    });
+    setEditingRecordatorioId(r.id);
+    setShowAddRecordatorio(true);
+  };
+
+  const cerrarModalRecordatorio = () => {
     setShowAddRecordatorio(false);
+    setEditingRecordatorioId(null);
+  };
+
+  const guardarRecordatorio = () => {
+    if (!formRecordatorio.titulo.trim()) return;
+    if (editingRecordatorioId) {
+      setRecordatorios(prev => prev.map(r => r.id === editingRecordatorioId ? {
+        ...r,
+        titulo: formRecordatorio.titulo.trim(),
+        categoria: formRecordatorio.categoria,
+        fecha: formRecordatorio.fecha || hoyISO(),
+        hora: formRecordatorio.hora || '08:00',
+        notificado: false,
+      } : r));
+    } else {
+      const nuevo = {
+        id: `r_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        titulo: formRecordatorio.titulo.trim(),
+        categoria: formRecordatorio.categoria,
+        fecha: formRecordatorio.fecha || hoyISO(),
+        hora: formRecordatorio.hora || '08:00',
+        completado: false,
+        notificado: false,
+      };
+      setRecordatorios(prev => [...prev, nuevo]);
+    }
+    cerrarModalRecordatorio();
   };
 
   const toggleRecordatorio = (id) => {
@@ -1190,6 +1313,7 @@ export default function OrganizApp() {
                               carpetaColorClass={getCarpetaColorClass(t.carpetaId)}
                               onToggle={toggleCompletar}
                               onDelete={eliminarTarea}
+                              onEdit={abrirEditarTarea}
                             />
                           ))}
                         </div>
@@ -1218,6 +1342,7 @@ export default function OrganizApp() {
                       carpetaColorClass={getCarpetaColorClass(t.carpetaId)}
                       onToggle={toggleCompletar}
                       onDelete={eliminarTarea}
+                      onEdit={abrirEditarTarea}
                     />
                   ))}
               </div>
@@ -1242,7 +1367,7 @@ export default function OrganizApp() {
                   </p>
                   <div className="space-y-2">
                     {lista.map(r => (
-                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} />
+                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} onEdit={abrirEditarRecordatorio} />
                     ))}
                   </div>
                 </div>
@@ -1261,7 +1386,7 @@ export default function OrganizApp() {
                 {archivadosAbiertos && (
                   <div className="space-y-2 mt-2">
                     {recordatoriosArchivados.map(r => (
-                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} />
+                      <ReminderCard key={r.id} recordatorio={r} onToggle={toggleRecordatorio} onDelete={eliminarRecordatorio} onEdit={abrirEditarRecordatorio} />
                     ))}
                   </div>
                 )}
@@ -1278,13 +1403,13 @@ export default function OrganizApp() {
         {showFabMenu && (
           <>
             <button
-              onClick={() => { setShowAddRecordatorio(true); setShowFabMenu(false); }}
+              onClick={() => { abrirNuevoRecordatorio(); setShowFabMenu(false); }}
               className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
             >
               Recordatorio <BellRing className="w-4 h-4 text-indigo-300" />
             </button>
             <button
-              onClick={() => { setShowAddModal(true); setShowFabMenu(false); }}
+              onClick={() => { abrirNuevaTarea(); setShowFabMenu(false); }}
               style={{ animationDelay: '40ms' }}
               className="flex items-center gap-2 pl-4 pr-3.5 py-2.5 rounded-full bg-slate-800 border border-white/10 shadow-lg text-sm font-medium text-slate-100 animate-[popIn_0.2s_ease-out_both]"
             >
@@ -1304,7 +1429,7 @@ export default function OrganizApp() {
       </div>
 
       {showAddModal && (
-        <Modal titulo="Nueva tarea" onClose={() => setShowAddModal(false)}>
+        <Modal titulo={editingTaskId ? 'Editar tarea' : 'Nueva tarea'} onClose={cerrarModalTarea}>
           <div className="space-y-4">
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Título</label>
@@ -1415,19 +1540,19 @@ export default function OrganizApp() {
             </div>
 
             <button
-              onClick={agregarTarea}
+              onClick={guardarTarea}
               disabled={!form.titulo.trim()}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-sm
                 disabled:opacity-40 active:scale-[0.98] transition-transform"
             >
-              Agregar tarea
+              {editingTaskId ? 'Guardar cambios' : 'Agregar tarea'}
             </button>
           </div>
         </Modal>
       )}
 
       {showAddRecordatorio && (
-        <Modal titulo="Nuevo recordatorio" onClose={() => setShowAddRecordatorio(false)}>
+        <Modal titulo={editingRecordatorioId ? 'Editar recordatorio' : 'Nuevo recordatorio'} onClose={cerrarModalRecordatorio}>
           <div className="space-y-4">
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Título</label>
@@ -1482,12 +1607,12 @@ export default function OrganizApp() {
             </div>
 
             <button
-              onClick={agregarRecordatorio}
+              onClick={guardarRecordatorio}
               disabled={!formRecordatorio.titulo.trim()}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-sm
                 disabled:opacity-40 active:scale-[0.98] transition-transform"
             >
-              Agregar recordatorio
+              {editingRecordatorioId ? 'Guardar cambios' : 'Agregar recordatorio'}
             </button>
           </div>
         </Modal>
@@ -1573,12 +1698,15 @@ export default function OrganizApp() {
       {showResumenSemanal && resumenSemanal && (
         <Modal titulo="Resumen semanal" onClose={() => setShowResumenSemanal(false)}>
           <div className="space-y-4">
+            <p className="text-[11px] text-slate-500 -mt-1">
+              Semana desde el {formatFechaCorta(resumenSemanal.semanaInicio)} · se reinicia cada lunes.
+            </p>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
               <BarChart3 className="w-8 h-8 text-indigo-300 shrink-0" />
               <div>
                 <p className="text-lg font-bold text-white leading-none">{resumenSemanal.puntosTotales} pts esta semana</p>
                 <p className="text-xs text-slate-400 mt-1.5">
-                  Cumpliste la meta {resumenSemanal.diasCumplidos} de {resumenSemanal.diasTotal} días registrados.
+                  Cumpliste la meta {resumenSemanal.diasCumplidos} de {resumenSemanal.diasTotal} días registrados hasta ahora.
                 </p>
               </div>
             </div>
@@ -1586,18 +1714,19 @@ export default function OrganizApp() {
             {resumenSemanal.pendientesCount > 0 ? (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <p className="text-sm text-amber-200">
-                  Te quedaron {resumenSemanal.pendientesCount} tarea{resumenSemanal.pendientesCount === 1 ? '' : 's'} sin hacer. La próxima semana empieza con esa deuda pendiente.
+                  Te quedaron {resumenSemanal.pendientesCount} tarea{resumenSemanal.pendientesCount === 1 ? '' : 's'} sin hacer del último día registrado.
                 </p>
                 <button
                   onClick={() => { setShowResumenSemanal(false); setShowRetomar(true); }}
-                  className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
+                  disabled={pendientesAyer.length === 0}
+                  className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold disabled:opacity-40"
                 >
                   Revisar pendientes
                 </button>
               </div>
             ) : (
               <p className="text-sm text-emerald-300 text-center py-2">
-                Cerraste la semana sin nada pendiente. S.A.P.O. no tiene quejas (por ahora).
+                Vas sin nada pendiente por ahora. S.A.P.O. no tiene quejas (todavía).
               </p>
             )}
           </div>
@@ -1679,18 +1808,76 @@ export default function OrganizApp() {
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
               <p className="text-sm text-slate-300 font-medium">Carpetas de tareas</p>
               {carpetas.length === 0 && (
-                <p className="text-xs text-slate-600 italic">Aún no tienes carpetas. Créalas al agregar una tarea.</p>
+                <p className="text-xs text-slate-600 italic">Aún no tienes carpetas. Crea la primera abajo.</p>
               )}
               <div className="space-y-1">
                 {carpetas.map((c, i) => (
-                  <div key={c.id} className={`flex items-center justify-between text-xs rounded-lg px-2.5 py-1.5 border ${colorCarpeta(i)}`}>
-                    <span>{c.nombre}</span>
-                    <button onClick={() => eliminarCarpeta(c.id)} className="hover:text-red-400">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  <div key={c.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 border ${colorCarpeta(i)}`}>
+                    {carpetaEditandoId === c.id ? (
+                      <>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={carpetaEditandoNombre}
+                          onChange={e => setCarpetaEditandoNombre(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && guardarEdicionCarpeta()}
+                          className="flex-1 min-w-0 bg-black/20 border border-white/20 rounded px-2 py-1 text-xs outline-none"
+                        />
+                        <button onClick={guardarEdicionCarpeta} className="shrink-0 hover:text-emerald-300" aria-label="Guardar nombre">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={cancelarEdicionCarpeta} className="shrink-0 hover:text-red-300" aria-label="Cancelar edición">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 min-w-0 truncate">{c.nombre}</span>
+                        <button onClick={() => iniciarEdicionCarpeta(c)} className="shrink-0 hover:text-white" aria-label="Editar carpeta">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => eliminarCarpeta(c.id)} className="shrink-0 hover:text-red-400" aria-label="Eliminar carpeta">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={nuevaCarpetaSettings}
+                  onChange={e => setNuevaCarpetaSettings(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && agregarCarpetaSettings()}
+                  placeholder="Nombre de la nueva carpeta"
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                />
+                <button
+                  onClick={agregarCarpetaSettings}
+                  disabled={!nuevaCarpetaSettings.trim()}
+                  className="px-3 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 disabled:opacity-40 shrink-0"
+                  aria-label="Agregar carpeta"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+              <p className="text-sm text-slate-300 font-medium flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4 text-indigo-300" /> Resumen semanal
+              </p>
+              {resumenSemanal ? (
+                <button
+                  onClick={() => setShowResumenSemanal(true)}
+                  className="w-full py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-medium"
+                >
+                  Ver resumen de esta semana ({resumenSemanal.puntosTotales} pts hasta ahora)
+                </button>
+              ) : (
+                <p className="text-xs text-slate-600 italic">Aún no hay nada que resumir esta semana.</p>
+              )}
             </div>
 
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
