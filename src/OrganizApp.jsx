@@ -4,7 +4,9 @@ import {
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
   Target, ListChecks, LayoutGrid, Award, ListOrdered,
   CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
+  Cloud, CloudOff, LogOut,
 } from 'lucide-react';
+import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirEstado, descargarEstado, suscribirseACambios } from './sync';
 
 /* ============================================================
    CONSTANTES Y DATOS ESTÁTICOS
@@ -569,6 +571,18 @@ export default function OrganizApp() {
   const [horarioLaboral, setHorarioLaboral] = useState(saved.horarioLaboral || horarioLaboralPorDefecto());
   const [ultimaAlertaJornada, setUltimaAlertaJornada] = useState(saved.ultimaAlertaJornada || '');
 
+  const [session, setSession] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced' | 'error'
+  const [syncError, setSyncError] = useState('');
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authAviso, setAuthAviso] = useState('');
+  const pushTimeoutRef = useRef(null);
+  const aplicandoRemotoRef = useRef(false);
+
   const [notifPermiso, setNotifPermiso] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -794,15 +808,156 @@ export default function OrganizApp() {
     return () => clearInterval(interval);
   }, [horarioLaboral, tareas, metaPorcentaje, ultimaAlertaJornada, notifPermiso, nombreMostrado]);
 
-  useEffect(() => {
-    guardarEstado({
-      tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
-      lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
-      finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada, resumenSemanal,
-    });
-  }, [tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
+  const construirEstadoCompleto = useCallback(() => ({
+    tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje,
+    lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
+    finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada, resumenSemanal,
+  }), [tareas, carpetas, recordatorios, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
       nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
       horarioLaboral, ultimaAlertaJornada, resumenSemanal]);
+
+  const aplicarEstadoRemoto = useCallback((remoto) => {
+    if (!remoto) return;
+    aplicandoRemotoRef.current = true;
+    setTareas(remoto.tareas || []);
+    setCarpetas(remoto.carpetas || []);
+    setRecordatorios(remoto.recordatorios || []);
+    setHistorial(remoto.historial || []);
+    setRacha(remoto.racha || 0);
+    setMejorRacha(remoto.mejorRacha ?? remoto.racha ?? 0);
+    setMetaPorcentaje(remoto.metaPorcentaje ?? 70);
+    setLastActiveDate(remoto.lastActiveDate || hoyISO());
+    setNombre(remoto.nombre || '');
+    setLastGreetingDate(remoto.lastGreetingDate || '');
+    setOnboardingCompleto(remoto.onboardingCompleto ?? true);
+    setFinDeSemanaLibre(remoto.finDeSemanaLibre ?? true);
+    setFestivosManual(remoto.festivosManual || []);
+    setHorarioLaboral(remoto.horarioLaboral || horarioLaboralPorDefecto());
+    setUltimaAlertaJornada(remoto.ultimaAlertaJornada || '');
+    setResumenSemanal(remoto.resumenSemanal || null);
+    // Permite que los efectos de guardado/push corran de nuevo en el siguiente ciclo
+    setTimeout(() => { aplicandoRemotoRef.current = false; }, 0);
+  }, []);
+
+  // Guarda en localStorage siempre; si hay sesión activa, además sube a la nube (con debounce)
+  useEffect(() => {
+    const estadoActual = construirEstadoCompleto();
+    guardarEstado(estadoActual);
+
+    if (session && syncDisponible && !aplicandoRemotoRef.current) {
+      if (pushTimeoutRef.current) clearTimeout(pushTimeoutRef.current);
+      pushTimeoutRef.current = setTimeout(async () => {
+        setSyncStatus('syncing');
+        const res = await subirEstado(estadoActual);
+        if (res.ok) {
+          setSyncStatus('synced');
+          setLastSyncedAt(new Date());
+          setSyncError('');
+        } else {
+          setSyncStatus('error');
+          setSyncError(res.error || 'Error al sincronizar');
+        }
+      }, 1200);
+    }
+    return () => {
+      if (pushTimeoutRef.current) clearTimeout(pushTimeoutRef.current);
+    };
+  }, [construirEstadoCompleto, session]);
+
+  // Al detectar sesión activa (login, o sesión ya guardada en el navegador): trae lo más reciente
+  useEffect(() => {
+    if (!session || !syncDisponible) return;
+    let cancelado = false;
+    (async () => {
+      setSyncStatus('syncing');
+      const res = await descargarEstado();
+      if (cancelado) return;
+      if (res.ok) {
+        if (res.data) {
+          aplicarEstadoRemoto(res.data);
+        } else {
+          // Cuenta recién creada: todavía no hay nada en la nube, subimos lo que hay en este dispositivo
+          subirEstado(construirEstadoCompleto());
+        }
+        setSyncStatus('synced');
+        setLastSyncedAt(res.updatedAt ? new Date(res.updatedAt) : new Date());
+        setSyncError('');
+      } else {
+        setSyncStatus('error');
+        setSyncError(res.error || 'Error al descargar');
+      }
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  // Mientras la app está abierta en varios dispositivos con la misma cuenta, escucha cambios en vivo
+  useEffect(() => {
+    if (!session || !syncDisponible) return;
+    const cancelarSuscripcion = suscribirseACambios((dataRemota, updatedAt) => {
+      aplicarEstadoRemoto(dataRemota);
+      setLastSyncedAt(new Date(updatedAt));
+    });
+    return cancelarSuscripcion;
+  }, [session, aplicarEstadoRemoto]);
+
+  // Detecta la sesión guardada en el navegador al abrir la app, y reacciona a login/logout
+  useEffect(() => {
+    if (!syncDisponible) return;
+    let activo = true;
+    obtenerSesionActual().then(s => { if (activo) setSession(s); });
+    const cancelarSuscripcion = suscribirseASesion(s => setSession(s));
+    return () => { activo = false; cancelarSuscripcion(); };
+  }, []);
+
+  const handleCrearCuenta = async () => {
+    setAuthError('');
+    setAuthAviso('');
+    if (!authEmail.trim() || authPassword.length < 6) {
+      setAuthError('Escribe un correo válido y una contraseña de al menos 6 caracteres.');
+      return;
+    }
+    setAuthLoading(true);
+    const res = await crearCuenta(authEmail.trim(), authPassword);
+    setAuthLoading(false);
+    if (!res.ok) {
+      setAuthError(res.error);
+      return;
+    }
+    if (res.requiereConfirmacion) {
+      setAuthAviso('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión aquí mismo.');
+    } else {
+      setSession(res.session);
+      setAuthPassword('');
+    }
+  };
+
+  const handleIniciarSesion = async () => {
+    setAuthError('');
+    setAuthAviso('');
+    if (!authEmail.trim() || !authPassword) {
+      setAuthError('Escribe tu correo y tu contraseña.');
+      return;
+    }
+    setAuthLoading(true);
+    const res = await iniciarSesion(authEmail.trim(), authPassword);
+    setAuthLoading(false);
+    if (!res.ok) {
+      setAuthError(res.error);
+      return;
+    }
+    setSession(res.session);
+    setAuthPassword('');
+  };
+
+  const handleCerrarSesion = async () => {
+    if (!window.confirm('¿Cerrar sesión en este dispositivo? Tus datos locales se quedan como están, solo se desconecta.')) return;
+    await cerrarSesion();
+    setSession(null);
+    setSyncStatus('idle');
+    setSyncError('');
+    setLastSyncedAt(null);
+  };
 
   const solicitarPermisoNotif = async () => {
     if (!('Notification' in window)) return;
@@ -1030,7 +1185,7 @@ export default function OrganizApp() {
   };
 
   const resetearDatos = () => {
-    if (!window.confirm('¿Seguro? Esto borra tareas, carpetas, recordatorios, racha, historial y tu nombre. Empiezas de cero, con S.A.P.O. y todo. No hay vuelta atrás.')) return;
+    if (!window.confirm('¿Seguro? Esto borra tareas, carpetas, recordatorios, racha, historial y tu nombre (si tienes sincronización activa, también se borra en la nube). No hay vuelta atrás.')) return;
     setTareas([]);
     setCarpetas([]);
     setRecordatorios([]);
@@ -1161,6 +1316,16 @@ export default function OrganizApp() {
               <Flame className={`w-4 h-4 ${racha > 0 ? 'text-orange-400' : 'text-slate-500'}`} />
               {racha}
             </button>
+            {session && (
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 rounded-full hover:bg-white/10"
+                aria-label="Estado de sincronización"
+                title={syncStatus === 'error' ? 'Error de sincronización' : 'Sincronizado'}
+              >
+                <Cloud className={`w-4 h-4 ${syncStatus === 'error' ? 'text-red-400' : syncStatus === 'syncing' ? 'text-slate-400 animate-pulse' : 'text-emerald-400'}`} />
+              </button>
+            )}
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-full hover:bg-white/10 text-slate-300"
@@ -1785,6 +1950,80 @@ export default function OrganizApp() {
       {showSettings && (
         <Modal titulo="Configuración" onClose={() => setShowSettings(false)}>
           <div className="space-y-5">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-3">
+              <p className="text-sm text-slate-300 font-medium flex items-center gap-1.5">
+                {session ? <Cloud className="w-4 h-4 text-emerald-400" /> : <CloudOff className="w-4 h-4 text-slate-500" />}
+                Sincronización entre dispositivos
+              </p>
+
+              {!syncDisponible && (
+                <p className="text-[11px] text-slate-500">
+                  La sincronización en la nube no está configurada todavía en este despliegue.
+                  Necesita variables de entorno de Supabase — revisa el README para activarla.
+                </p>
+              )}
+
+              {syncDisponible && !session && (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-slate-500">
+                    Crea una cuenta o inicia sesión con el mismo correo en tus otros dispositivos
+                    (o los de tus amigos, cada quien con la suya) para sincronizar automáticamente.
+                  </p>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    placeholder="Correo"
+                    autoComplete="email"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                  />
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={e => setAuthPassword(e.target.value)}
+                    placeholder="Contraseña (mínimo 6 caracteres)"
+                    autoComplete="current-password"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-indigo-400/60"
+                  />
+                  {authError && <p className="text-[11px] text-red-400">{authError}</p>}
+                  {authAviso && <p className="text-[11px] text-emerald-400">{authAviso}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleIniciarSesion}
+                      disabled={authLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold disabled:opacity-50"
+                    >
+                      Iniciar sesión
+                    </button>
+                    <button
+                      onClick={handleCrearCuenta}
+                      disabled={authLoading}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold disabled:opacity-50"
+                    >
+                      Crear cuenta
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {syncDisponible && session && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300 truncate">Conectado como {session.user.email}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {syncStatus === 'syncing' && 'Sincronizando...'}
+                    {syncStatus === 'synced' && lastSyncedAt && `Sincronizado · última vez ${lastSyncedAt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`}
+                    {syncStatus === 'error' && (syncError || 'Hubo un error al sincronizar.')}
+                  </p>
+                  <button
+                    onClick={handleCerrarSesion}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" /> Tu nombre
