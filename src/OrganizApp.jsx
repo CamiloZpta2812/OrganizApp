@@ -238,20 +238,52 @@ function SapoAvatar({ className }) {
   );
 }
 
-// Ventana flotante de S.A.P.O: sube desde abajo, para saludos diarios y onboarding
-function SapoSheet({ mode, message, nombre, onNombreChange, onPrimary, onClose }) {
-  const puedeCerrar = mode !== 'onboarding';
+// Pantalla completa de bienvenida de S.A.P.O (onboarding): tapa toda la app, no es un overlay
+function SapoOnboardingScreen({ nombre, onNombreChange, onContinuar }) {
+  return (
+    <div className="fixed inset-0 z-50 min-h-screen w-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 text-white overflow-y-auto">
+      <style>{`
+        @keyframes fadeInUp { from { opacity:0; transform: translateY(14px);} to { opacity:1; transform: translateY(0);} }
+      `}</style>
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center animate-[fadeInUp_0.5s_ease-out_both]">
+          <SapoAvatar className="w-28 h-28 mb-5" />
+          <h1 className="text-xl font-bold text-emerald-300">S.A.P.O.</h1>
+          <p className="text-xs text-slate-500 mt-1 mb-6">Supervisor Autónomo para Procrastinadores Obligados</p>
+          <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING}</p>
+          <input
+            autoFocus
+            type="text"
+            value={nombre}
+            onChange={e => onNombreChange(e.target.value)}
+            placeholder="Escribe tu nombre aquí..."
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-center outline-none focus:border-emerald-400/60"
+          />
+          <button
+            onClick={onContinuar}
+            className="w-full mt-4 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
+          >
+            {nombre.trim() ? `Encantado, ${nombre.trim()}` : 'Continuar'}
+          </button>
+          <p className="text-[11px] text-slate-600 mt-8">OrganizApp · Productividad con actitud</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Cuadro emergente centrado de S.A.P.O: para el saludo diario (o cuando lo invocas manualmente)
+function SapoPopup({ message, onClose }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
-      onClick={puedeCerrar ? onClose : undefined}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border-t sm:border border-emerald-500/20 rounded-t-3xl sm:rounded-3xl p-5 pb-6 shadow-2xl animate-[sapoUp_0.45s_cubic-bezier(0.34,1.56,0.64,1)_both]"
+        className="w-full max-w-sm bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/20 rounded-3xl p-6 shadow-2xl animate-[sapoPop_0.25s_ease-out_both]"
       >
-        <div className="w-10 h-1.5 rounded-full bg-white/15 mx-auto mb-4" />
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-3 min-w-0">
             <SapoAvatar className="w-14 h-14 shrink-0" />
             <div className="min-w-0 pt-0.5">
@@ -259,31 +291,18 @@ function SapoSheet({ mode, message, nombre, onNombreChange, onPrimary, onClose }
               <p className="text-[10px] text-slate-500 mt-1 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
             </div>
           </div>
-          {puedeCerrar && (
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 text-slate-500 shrink-0">
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 text-slate-500 shrink-0">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <p className="text-sm text-slate-200 leading-relaxed mt-3">{message}</p>
-
-        {mode === 'onboarding' && (
-          <input
-            autoFocus
-            type="text"
-            value={nombre}
-            onChange={e => onNombreChange(e.target.value)}
-            placeholder="Escribe tu nombre aquí..."
-            className="w-full mt-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-emerald-400/60"
-          />
-        )}
+        <p className="text-sm text-slate-200 leading-relaxed">{message}</p>
 
         <button
-          onClick={onPrimary}
-          className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
+          onClick={onClose}
+          className="mt-5 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold text-sm active:scale-[0.98] transition-transform"
         >
-          {mode === 'onboarding' ? (nombre.trim() ? `Encantado, ${nombre.trim()}` : 'Continuar') : 'Ya, ya, entendido'}
+          Ya, ya, entendido
         </button>
       </div>
     </div>
@@ -483,9 +502,8 @@ export default function OrganizApp() {
   const [showAddRecordatorio, setShowAddRecordatorio] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSugerencia, setShowSugerencia] = useState(false);
-  const [showGreeting, setShowGreeting] = useState(false);
+  const [showGreetingPopup, setShowGreetingPopup] = useState(false);
   const [showRachaInfo, setShowRachaInfo] = useState(false);
-  const [sapoMode, setSapoMode] = useState('greeting'); // 'greeting' | 'onboarding'
   const [greetingMsg, setGreetingMsg] = useState('');
   const [coachMsg, setCoachMsg] = useState(null);
   const [nuevoFestivo, setNuevoFestivo] = useState('');
@@ -520,9 +538,8 @@ export default function OrganizApp() {
   const lanzarSaludoSiCorresponde = useCallback((forzar = false) => {
     const hoyStr = hoyISO();
     if (forzar || lastGreetingDate !== hoyStr) {
-      setSapoMode('greeting');
       setGreetingMsg(conNombre(pickRandom(MENSAJES_SAPO), nombreMostrado));
-      setShowGreeting(true);
+      setShowGreetingPopup(true);
       if (!forzar) setLastGreetingDate(hoyStr);
     }
   }, [lastGreetingDate, nombreMostrado]);
@@ -530,15 +547,10 @@ export default function OrganizApp() {
   const completarOnboarding = () => {
     setOnboardingCompleto(true);
     setLastGreetingDate(hoyISO());
-    setShowGreeting(false);
   };
 
   useEffect(() => {
-    if (!onboardingCompleto) {
-      setSapoMode('onboarding');
-      setGreetingMsg(MSG_ONBOARDING);
-      setShowGreeting(true);
-    } else {
+    if (onboardingCompleto) {
       lanzarSaludoSiCorresponde(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -729,14 +741,18 @@ export default function OrganizApp() {
   };
 
   const resetearDatos = () => {
-    if (!window.confirm('¿Seguro? Esto borra tareas, recordatorios, racha e historial. No hay vuelta atrás.')) return;
+    if (!window.confirm('¿Seguro? Esto borra tareas, recordatorios, racha, historial y tu nombre. Empiezas de cero, con S.A.P.O. y todo. No hay vuelta atrás.')) return;
     setTareas([]);
     setRecordatorios([]);
     setHistorial([]);
     setRacha(0);
     setMejorRacha(0);
     setLastActiveDate(hoyISO());
+    setNombre('');
+    setLastGreetingDate('');
+    setShowGreetingPopup(false);
     setShowSettings(false);
+    setOnboardingCompleto(false);
   };
 
   /* --------------------------------------------------------
@@ -804,13 +820,25 @@ export default function OrganizApp() {
   /* --------------------------------------------------------
      RENDER
      -------------------------------------------------------- */
+
+  // Onboarding: pantalla completa, tapa toda la app hasta que se complete
+  if (!onboardingCompleto) {
+    return (
+      <SapoOnboardingScreen
+        nombre={nombre}
+        onNombreChange={setNombre}
+        onContinuar={completarOnboarding}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       <style>{`
         @keyframes slideDown { from { opacity:0; transform: translate(-50%, -12px);} to { opacity:1; transform: translate(-50%, 0);} }
         @keyframes slideUp { from { opacity:0; transform: translateY(24px);} to { opacity:1; transform: translateY(0);} }
         @keyframes popIn { from { opacity:0; transform: translateY(8px) scale(0.9);} to { opacity:1; transform: translateY(0) scale(1);} }
-        @keyframes sapoUp { from { opacity:0; transform: translateY(100%);} to { opacity:1; transform: translateY(0);} }
+        @keyframes sapoPop { from { opacity:0; transform: scale(0.92);} to { opacity:1; transform: scale(1);} }
       `}</style>
 
       <CoachToast mensaje={coachMsg} />
@@ -1150,23 +1178,23 @@ export default function OrganizApp() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="min-w-0">
                 <label className="text-xs text-slate-400 mb-1 block">Fecha</label>
                 <input
                   type="date"
                   value={formRecordatorio.fecha}
                   onChange={e => setFormRecordatorio({ ...formRecordatorio, fecha: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+                  className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="text-xs text-slate-400 mb-1 block">Hora (opcional)</label>
                 <input
                   type="time"
                   value={formRecordatorio.hora}
                   onChange={e => setFormRecordatorio({ ...formRecordatorio, hora: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+                  className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
                 />
               </div>
             </div>
@@ -1212,15 +1240,11 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {/* VENTANA FLOTANTE DE S.A.P.O (saludo diario u onboarding) */}
-      {showGreeting && (
-        <SapoSheet
-          mode={sapoMode}
+      {/* CUADRO EMERGENTE CENTRADO DE S.A.P.O (saludo diario, o al tocar el logo) */}
+      {showGreetingPopup && (
+        <SapoPopup
           message={greetingMsg}
-          nombre={nombre}
-          onNombreChange={setNombre}
-          onPrimary={sapoMode === 'onboarding' ? completarOnboarding : () => setShowGreeting(false)}
-          onClose={() => setShowGreeting(false)}
+          onClose={() => setShowGreetingPopup(false)}
         />
       )}
 
@@ -1302,20 +1326,22 @@ export default function OrganizApp() {
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-3">
               <p className="text-sm text-slate-300 font-medium">Días que no cuentan para la racha</p>
 
-              <button
-                onClick={() => setFinDeSemanaLibre(v => !v)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-xs font-medium transition
-                  ${finDeSemanaLibre ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-white/5 border-white/10 text-slate-400'}`}
-              >
-                Fines de semana no cuentan
-                <span className={`w-9 h-5 rounded-full relative transition-colors ${finDeSemanaLibre ? 'bg-emerald-500' : 'bg-slate-700'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${finDeSemanaLibre ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </span>
-              </button>
+              <div className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-white/10 bg-white/5">
+                <span className="text-xs font-medium text-slate-300">Fines de semana no cuentan</span>
+                <button
+                  onClick={() => setFinDeSemanaLibre(v => !v)}
+                  role="switch"
+                  aria-checked={finDeSemanaLibre}
+                  aria-label="Fines de semana no cuentan para la racha"
+                  className={`relative w-10 h-6 rounded-full shrink-0 transition-colors ${finDeSemanaLibre ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${finDeSemanaLibre ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
 
               <div>
                 <p className="text-[11px] text-slate-500 mb-1.5">
-                  Festivos manuales (no calculamos festivos colombianos automáticamente para no arriesgarnos a poner una fecha mal — agrégalos tú):
+                  Festivos, incapacidades o vacaciones (no calculamos festivos colombianos automáticamente para no arriesgarnos a poner una fecha mal — agrega aquí cualquier día que no debería contar, sea festivo, incapacidad o vacaciones):
                 </p>
                 <div className="flex gap-2">
                   <input
