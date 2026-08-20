@@ -619,7 +619,7 @@ function SapoOnboardingScreen({
                     <p className="text-xs text-slate-300 leading-relaxed mb-2">
                       Sarcástico, directo y sin filtro. Te va a celebrar cuando cumplas, pero
                       también te va a hacer sentir el peso de tu procrastinación con humor
-                      ácido. Si te gusta que te den con cariño (pero con cariño duro), este es tu bot.
+                      ácido. Si prefieres que la verdad te llegue sin anestesia, este es tu bot.
                     </p>
                     <p className="text-[11px] text-slate-500 italic">"Ah, decidiste aparecer. Qué generoso de tu parte."</p>
                     <p className="text-[11px] text-slate-500 italic">"Tu procrastinación debería ser deporte olímpico."</p>
