@@ -61,19 +61,20 @@ export function suscribirseASesion(callback) {
    sobreescribe lo que otro dispositivo esté guardando en otra sección.
    ============================================================ */
 
-export async function subirSeccion(seccion, data) {
+export async function subirSeccion(seccion, data, marcaTiempo) {
   if (!supabase) return { ok: false, error: 'Sincronización no disponible' };
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData?.user?.id;
   if (!userId) return { ok: false, error: 'No has iniciado sesión' };
+  const updatedAt = marcaTiempo || new Date().toISOString();
   const { error } = await supabase
     .from(TABLA)
     .upsert(
-      { user_id: userId, seccion, data, updated_at: new Date().toISOString() },
+      { user_id: userId, seccion, data, updated_at: updatedAt },
       { onConflict: 'user_id,seccion' }
     );
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return { ok: true, updatedAt };
 }
 
 export async function descargarSeccion(seccion) {

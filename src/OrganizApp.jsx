@@ -512,8 +512,7 @@ function CarpetaBadge({ nombre, colorClass }) {
 function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendiente, onToggle, onDelete, onEdit, onMover }) {
   const [recienCompletada, setRecienCompletada] = useState(false);
 
-  const handleToggle = (e) => {
-    e.stopPropagation();
+  const handleToggle = () => {
     if (!tarea.completada) {
       setRecienCompletada(true);
       setTimeout(() => setRecienCompletada(false), 700);
@@ -523,11 +522,10 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
 
   return (
     <div
-      onClick={() => onEdit(tarea)}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150 cursor-pointer
+      className={`relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150
         ${tarea.completada
           ? 'bg-white/[0.03] border-white/5 opacity-60'
-          : 'bg-white/[0.06] border-white/10 hover:border-indigo-400/50 hover:bg-white/[0.14] active:border-indigo-400/60 active:bg-white/[0.16]'}
+          : 'bg-white/[0.06] border-white/10'}
         ${recienCompletada ? 'scale-[1.02] ring-2 ring-emerald-400/40' : ''}
       `}
     >
@@ -538,7 +536,7 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
       >
         {tarea.completada
           ? <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-          : <Circle className="w-6 h-6 text-slate-400 group-hover:text-slate-200" />}
+          : <Circle className="w-6 h-6 text-slate-400" />}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -565,22 +563,22 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
 
         {/* Acciones agrupadas: separadas de los badges para que no se confundan con etiquetas */}
         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/5">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(tarea); }}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10"
-          >
-            <Pencil className="w-3.5 h-3.5" /> Editar
-          </button>
           {onMover && (
             <button
-              onClick={(e) => { e.stopPropagation(); onMover(tarea.id); }}
+              onClick={() => onMover(tarea.id)}
               className="flex items-center gap-1 text-[11px] text-emerald-300 hover:text-emerald-200 px-2 py-1 rounded-lg hover:bg-emerald-500/10"
             >
               <ArrowRight className="w-3.5 h-3.5" /> {esPendiente ? 'Mover a hoy' : 'A pendientes'}
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(tarea.id); }}
+            onClick={() => onEdit(tarea)}
+            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Editar
+          </button>
+          <button
+            onClick={() => onDelete(tarea.id)}
             className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 ml-auto"
           >
             <Trash2 className="w-3.5 h-3.5" /> Eliminar
@@ -594,21 +592,20 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
 function ReminderCard({ recordatorio, categoriaNombre, categoriaColorClass, onToggle, onDelete, onEdit }) {
   return (
     <div
-      onClick={() => onEdit(recordatorio)}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150 cursor-pointer
+      className={`relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150
         ${recordatorio.completado
           ? 'bg-white/[0.03] border-white/5 opacity-60'
-          : 'bg-white/[0.06] border-white/10 hover:border-indigo-400/50 hover:bg-white/[0.14] active:border-indigo-400/60 active:bg-white/[0.16]'}
+          : 'bg-white/[0.06] border-white/10'}
       `}
     >
       <button
-        onClick={(e) => { e.stopPropagation(); onToggle(recordatorio.id); }}
+        onClick={() => onToggle(recordatorio.id)}
         className="mt-0.5 shrink-0 transition-transform duration-200 active:scale-90"
         aria-label="Marcar recordatorio hecho"
       >
         {recordatorio.completado
           ? <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-          : <Circle className="w-6 h-6 text-slate-400 group-hover:text-slate-200" />}
+          : <Circle className="w-6 h-6 text-slate-400" />}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -624,13 +621,13 @@ function ReminderCard({ recordatorio, categoriaNombre, categoriaColorClass, onTo
 
         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/5">
           <button
-            onClick={(e) => { e.stopPropagation(); onEdit(recordatorio); }}
+            onClick={() => onEdit(recordatorio)}
             className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10"
           >
             <Pencil className="w-3.5 h-3.5" /> Editar
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(recordatorio.id); }}
+            onClick={() => onDelete(recordatorio.id)}
             className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 ml-auto"
           >
             <Trash2 className="w-3.5 h-3.5" /> Eliminar
@@ -714,11 +711,13 @@ function NotaContentEditor({ initialValue, onChange }) {
 }
 
 
-function Modal({ titulo, onClose, children }) {
+function Modal({ titulo, onClose, children, centrado = false }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+    <div className={`fixed inset-0 z-40 flex ${centrado ? 'items-center p-4' : 'items-end sm:items-center p-0 sm:p-4'} justify-center bg-black/60 backdrop-blur-sm`}>
       <div
-        className="w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[slideUp_0.3s_ease-out]"
+        className={centrado
+          ? 'w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[sapoPop_0.25s_ease-out]'
+          : 'w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[slideUp_0.3s_ease-out]'}
         style={{ paddingBottom: 'max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem))' }}
       >
         <div className="flex items-center justify-between mb-4">
@@ -778,6 +777,7 @@ export default function OrganizApp() {
   const aplicandoRemotoRef = useRef({});
   const pullListoRef = useRef({});
   const seccionesDataRef = useRef({});
+  const ultimaMarcaRef = useRef({});
 
   const [notifPermiso, setNotifPermiso] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
@@ -1085,7 +1085,12 @@ export default function OrganizApp() {
     pushTimeoutsRef.current[seccion] = setTimeout(async () => {
       setSyncStatus('syncing');
       // Se sube el estado más reciente al momento de disparar (no uno capturado hace 1.2s).
-      const res = await subirSeccion(seccion, seccionesDataRef.current[seccion]);
+      // Se registra la marca de tiempo ANTES de enviarla, para que si Supabase nos devuelve
+      // este mismo cambio por el canal de tiempo real (un "eco" de nuestro propio push),
+      // lo podamos reconocer e ignorar en vez de volver a aplicarlo y pisar algo más reciente.
+      const marcaTiempo = new Date().toISOString();
+      ultimaMarcaRef.current[seccion] = marcaTiempo;
+      const res = await subirSeccion(seccion, seccionesDataRef.current[seccion], marcaTiempo);
       if (res.ok) {
         setSyncStatus('synced');
         setLastSyncedAt(new Date());
@@ -1120,9 +1125,12 @@ export default function OrganizApp() {
         if (res.ok) {
           if (res.data) {
             aplicarSeccion(seccion, res.data);
+            if (res.updatedAt) ultimaMarcaRef.current[seccion] = res.updatedAt;
           } else {
             // Esta sección todavía no existe en la nube para esta cuenta: subimos lo local
-            subirSeccion(seccion, seccionesDataRef.current[seccion]);
+            const marcaTiempo = new Date().toISOString();
+            ultimaMarcaRef.current[seccion] = marcaTiempo;
+            subirSeccion(seccion, seccionesDataRef.current[seccion], marcaTiempo);
           }
         }
         pullListoRef.current[seccion] = true;
@@ -1175,6 +1183,14 @@ export default function OrganizApp() {
   useEffect(() => {
     if (!session || !syncDisponible) return;
     const cancelarSuscripcion = suscribirseATodo((seccion, data, updatedAt) => {
+      // Si esta marca de tiempo es igual o más vieja que la última que nosotros mismos
+      // subimos (o ya recibimos) para esta sección, es un eco de nuestro propio cambio
+      // (o algo ya superado) — se ignora para no revertir una acción más reciente
+      // (por ejemplo, marcar/desmarcar una tarea justo antes de que llegue el eco).
+      if (ultimaMarcaRef.current[seccion] && updatedAt <= ultimaMarcaRef.current[seccion]) {
+        return;
+      }
+      ultimaMarcaRef.current[seccion] = updatedAt;
       aplicarSeccion(seccion, data);
       setLastSyncedAt(new Date(updatedAt));
     });
@@ -2433,7 +2449,7 @@ export default function OrganizApp() {
       )}
 
       {showNotaView && viewingNota && (
-        <Modal titulo={viewingNota.titulo || 'Nota'} onClose={() => setShowNotaView(false)}>
+        <Modal titulo={viewingNota.titulo || 'Nota'} onClose={() => setShowNotaView(false)} centrado>
           <div className="space-y-4">
             <div className="flex items-center flex-wrap gap-1.5">
               {viewingNota.categoriaId && (
