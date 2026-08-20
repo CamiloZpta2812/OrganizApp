@@ -4,7 +4,7 @@ import {
   Star, Bell, BellOff, BellRing, ChevronDown, ChevronUp,
   Target, ListChecks, LayoutGrid, Award, ListOrdered,
   CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
-  Cloud, CloudOff, LogOut, StickyNote, Bold, Italic, List,
+  Cloud, CloudOff, LogOut, StickyNote, Bold, Italic, List, ArrowRight, Inbox,
 } from 'lucide-react';
 import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirSeccion, descargarSeccion, suscribirseATodo } from './sync';
 
@@ -499,7 +499,7 @@ function CarpetaBadge({ nombre, colorClass }) {
   );
 }
 
-function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete, onEdit }) {
+function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendiente, onToggle, onDelete, onEdit, onMover }) {
   const [recienCompletada, setRecienCompletada] = useState(false);
 
   const handleToggle = (e) => {
@@ -546,6 +546,19 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, onToggle, onDelete,
           <span className="flex items-center gap-1 text-[11px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">
             <Award className="w-3 h-3 text-amber-400" /> {tarea.puntos} pts
           </span>
+          {fechaBadge && (
+            <span className="flex items-center gap-1 text-[11px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+              <CalendarClock className="w-3 h-3" /> {fechaBadge}
+            </span>
+          )}
+          {onMover && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onMover(tarea.id); }}
+              className="flex items-center gap-1 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full hover:bg-emerald-500/20"
+            >
+              {esPendiente ? 'Mover a hoy' : 'Enviar a pendientes'} <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -752,7 +765,7 @@ export default function OrganizApp() {
   );
 
   const [activeTab, setActiveTab] = useState('tareas');
-  const [vistaLista, setVistaLista] = useState(false);
+  const [vistaTareas, setVistaTareas] = useState('tablero'); // 'tablero' | 'lista' | 'pendientes'
   const [carpetaFiltro, setCarpetaFiltro] = useState(null);
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -792,7 +805,7 @@ export default function OrganizApp() {
   });
 
   const [form, setForm] = useState({
-    titulo: '', carpetaId: null, duracion: 30, nivel: 3,
+    titulo: '', carpetaId: null, duracion: 30, nivel: 3, fecha: hoyISO(),
   });
 
   const [formRecordatorio, setFormRecordatorio] = useState({
@@ -1383,7 +1396,7 @@ export default function OrganizApp() {
   };
 
   const abrirNuevaTarea = () => {
-    setForm({ titulo: '', carpetaId: null, duracion: 30, nivel: 3 });
+    setForm({ titulo: '', carpetaId: null, duracion: 30, nivel: 3, fecha: hoyISO() });
     setEditingTaskId(null);
     setShowAddModal(true);
   };
@@ -1394,6 +1407,7 @@ export default function OrganizApp() {
       carpetaId: tarea.carpetaId || null,
       duracion: tarea.duracion,
       nivel: tarea.nivel,
+      fecha: tarea.fecha || null,
     });
     setEditingTaskId(tarea.id);
     setShowAddModal(true);
@@ -1408,6 +1422,7 @@ export default function OrganizApp() {
 
   const guardarTarea = () => {
     if (!form.titulo.trim()) return;
+    const fechaFinal = form.fecha || null;
     if (editingTaskId) {
       setTareas(prev => prev.map(t => t.id === editingTaskId ? {
         ...t,
@@ -1416,6 +1431,7 @@ export default function OrganizApp() {
         duracion: Number(form.duracion) || 0,
         nivel: Number(form.nivel),
         puntos: calcularPuntos(form.duracion, form.nivel),
+        fecha: fechaFinal,
       } : t));
     } else {
       const nueva = {
@@ -1425,12 +1441,22 @@ export default function OrganizApp() {
         duracion: Number(form.duracion) || 0,
         nivel: Number(form.nivel),
         puntos: calcularPuntos(form.duracion, form.nivel),
-        fecha: hoyISO(),
+        fecha: fechaFinal,
         completada: false,
       };
       setTareas(prev => [...prev, nueva]);
     }
     cerrarModalTarea();
+  };
+
+  // Mueve una tarea pendiente (sin fecha o programada) al día de hoy
+  const moverTareaAHoy = (id) => {
+    setTareas(prev => prev.map(t => t.id === id ? { ...t, fecha: hoyISO() } : t));
+  };
+
+  // Envía una tarea de hoy al cajón de pendientes (sin fecha), sin afectar la racha
+  const moverTareaAPendientes = (id) => {
+    setTareas(prev => prev.map(t => t.id === id ? { ...t, fecha: null } : t));
   };
 
   const toggleCompletar = (id) => {
@@ -1486,6 +1512,18 @@ export default function OrganizApp() {
     setShowRetomar(false);
     setPendientesAyer([]);
     setSeleccionRetomar({});
+  };
+
+  // En vez de traerla a hoy o descartarla, la manda directo al cajón de Pendientes (sin fecha)
+  const enviarPendienteAyerABacklog = (tarea) => {
+    const nueva = {
+      ...tarea,
+      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      fecha: null,
+      completada: false,
+    };
+    setTareas(prev => [...prev, nueva]);
+    setPendientesAyer(prev => prev.filter(t => t.id !== tarea.id));
   };
 
   const abrirNuevoRecordatorio = () => {
@@ -1590,6 +1628,25 @@ export default function OrganizApp() {
     () => carpetaFiltro ? tareasHoy.filter(t => t.carpetaId === carpetaFiltro) : tareasHoy,
     [tareasHoy, carpetaFiltro]
   );
+
+  // Pendientes: tareas sin fecha (backlog) o programadas para un día distinto a hoy.
+  // Nunca las toca el cierre de día (solo procesa tareas cuya fecha sea exactamente
+  // el día que terminó), así que nunca afectan la racha ni la meta diaria.
+  const tareasPendientesBacklog = useMemo(
+    () => tareas.filter(t => t.fecha !== hoy && !t.completada),
+    [tareas, hoy]
+  );
+  const tareasPendientesVisibles = useMemo(() => {
+    const filtradas = carpetaFiltro
+      ? tareasPendientesBacklog.filter(t => t.carpetaId === carpetaFiltro)
+      : tareasPendientesBacklog;
+    return [...filtradas].sort((a, b) => {
+      if (!a.fecha && !b.fecha) return b.nivel - a.nivel;
+      if (!a.fecha) return -1;
+      if (!b.fecha) return 1;
+      return a.fecha.localeCompare(b.fecha);
+    });
+  }, [tareasPendientesBacklog, carpetaFiltro]);
 
   const tareasPorCuadrante = useMemo(() => {
     const grupos = { hacer: [], programar: [], delegar: [], eliminar: [] };
@@ -1813,31 +1870,45 @@ export default function OrganizApp() {
             )}
 
             <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 overflow-x-auto">
                 <button
-                  onClick={() => setVistaLista(false)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
-                    ${!vistaLista ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                  onClick={() => setVistaTareas('tablero')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
+                    ${vistaTareas === 'tablero' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   <LayoutGrid className="w-4 h-4" /> Tablero
                 </button>
                 <button
-                  onClick={() => setVistaLista(true)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
-                    ${vistaLista ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                  onClick={() => setVistaTareas('lista')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
+                    ${vistaTareas === 'lista' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                 >
                   <ListChecks className="w-4 h-4" /> Lista
                 </button>
+                <button
+                  onClick={() => setVistaTareas('pendientes')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition relative
+                    ${vistaTareas === 'pendientes' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  <Inbox className="w-4 h-4" /> Pendientes
+                  {tareasPendientesVisibles.length > 0 && (
+                    <span className="ml-0.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">
+                      {tareasPendientesVisibles.length}
+                    </span>
+                  )}
+                </button>
               </div>
-              <button
-                onClick={() => setShowSugerencia(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
-              >
-                <ListOrdered className="w-4 h-4" /> Orden
-              </button>
+              {vistaTareas !== 'pendientes' && (
+                <button
+                  onClick={() => setShowSugerencia(true)}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
+                >
+                  <ListOrdered className="w-4 h-4" /> Orden
+                </button>
+              )}
             </div>
 
-            {!vistaLista && (
+            {vistaTareas === 'tablero' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.keys(CUADRANTES_INFO).map(q => {
                   const info = CUADRANTES_INFO[q];
@@ -1869,6 +1940,7 @@ export default function OrganizApp() {
                               onToggle={toggleCompletar}
                               onDelete={eliminarTarea}
                               onEdit={abrirEditarTarea}
+                              onMover={moverTareaAPendientes}
                             />
                           ))}
                         </div>
@@ -1879,7 +1951,7 @@ export default function OrganizApp() {
               </div>
             )}
 
-            {vistaLista && (
+            {vistaTareas === 'lista' && (
               <div className="space-y-2">
                 {tareasVisibles.length === 0 && (
                   <p className="text-sm text-slate-500 text-center py-10">
@@ -1898,8 +1970,38 @@ export default function OrganizApp() {
                       onToggle={toggleCompletar}
                       onDelete={eliminarTarea}
                       onEdit={abrirEditarTarea}
+                      onMover={moverTareaAPendientes}
                     />
                   ))}
+              </div>
+            )}
+
+            {vistaTareas === 'pendientes' && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500 mb-1">
+                  Tareas sin fecha o programadas para otro día. No cuentan para ninguna meta diaria
+                  ni afectan tu racha hasta que las muevas a hoy.
+                </p>
+                {tareasPendientesVisibles.length === 0 && (
+                  <p className="text-sm text-slate-500 text-center py-10">
+                    No tienes tareas pendientes guardadas. Créalas marcando "Pendiente (sin fecha)"
+                    al agregar una tarea.
+                  </p>
+                )}
+                {tareasPendientesVisibles.map(t => (
+                  <TaskCard
+                    key={t.id}
+                    tarea={t}
+                    carpetaNombre={getCarpeta(t.carpetaId)?.nombre}
+                    carpetaColorClass={getCarpetaColorClass(t.carpetaId)}
+                    fechaBadge={t.fecha ? formatFechaCorta(t.fecha) : null}
+                    esPendiente
+                    onToggle={toggleCompletar}
+                    onDelete={eliminarTarea}
+                    onEdit={abrirEditarTarea}
+                    onMover={moverTareaAHoy}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -2111,6 +2213,39 @@ export default function OrganizApp() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Fecha (opcional)</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <button
+                  onClick={() => setForm({ ...form, fecha: hoyISO() })}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition
+                    ${form.fecha === hoyISO() ? 'bg-indigo-500/30 border-indigo-400/50 text-indigo-200' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={() => setForm({ ...form, fecha: null })}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition
+                    ${!form.fecha ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-white/5 text-slate-400 border-white/10'}`}
+                >
+                  Pendiente (sin fecha)
+                </button>
+              </div>
+              <div className="min-w-0 overflow-hidden rounded-xl">
+                <input
+                  type="date"
+                  value={form.fecha || ''}
+                  onChange={e => setForm({ ...form, fecha: e.target.value || null })}
+                  className="w-full max-w-full min-w-0 box-border bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                {form.fecha
+                  ? 'Aparecerá en el día que elijas.'
+                  : 'Sin fecha, la tarea vive en "Pendientes" y no cuenta para ninguna meta diaria ni afecta tu racha.'}
+              </p>
             </div>
 
             <div>
@@ -2395,22 +2530,31 @@ export default function OrganizApp() {
         <Modal titulo="¿Retomamos algo de ayer?" onClose={descartarRetomar}>
           <div className="space-y-3">
             <p className="text-xs text-slate-500">
-              Estas tareas quedaron sin hacer ayer. Elige cuáles traer a hoy, o descártalas sin culpa.
+              Estas tareas quedaron sin hacer ayer. Elige cuáles traer a hoy, mándalas a
+              Pendientes si no son para ahora, o descártalas sin culpa.
             </p>
             <div className="space-y-2">
               {pendientesAyer.map(t => (
-                <label key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={seleccionRetomar[t.id] ?? true}
-                    onChange={e => setSeleccionRetomar(prev => ({ ...prev, [t.id]: e.target.checked }))}
-                    className="w-4 h-4 accent-indigo-500 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-100 break-words">{t.titulo}</p>
-                    <p className="text-[11px] text-slate-500">Prioridad {t.nivel}/5 · {formatDuracion(t.duracion)}</p>
-                  </div>
-                </label>
+                <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+                  <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={seleccionRetomar[t.id] ?? true}
+                      onChange={e => setSeleccionRetomar(prev => ({ ...prev, [t.id]: e.target.checked }))}
+                      className="w-4 h-4 accent-indigo-500 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-100 break-words">{t.titulo}</p>
+                      <p className="text-[11px] text-slate-500">Prioridad {t.nivel}/5 · {formatDuracion(t.duracion)}</p>
+                    </div>
+                  </label>
+                  <button
+                    onClick={() => enviarPendienteAyerABacklog(t)}
+                    className="shrink-0 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-full hover:bg-emerald-500/20"
+                  >
+                    A pendientes
+                  </button>
+                </div>
               ))}
             </div>
             <div className="flex gap-2 pt-1">
