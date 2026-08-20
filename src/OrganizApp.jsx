@@ -471,6 +471,7 @@ function CoachToast({ mensaje }) {
     roast: { grad: 'from-rose-500/95 to-red-500/95 border-rose-300/50', emoji: '😈' },
     meta:  { grad: 'from-amber-400/95 to-orange-500/95 border-amber-200/50', emoji: '🏆' },
     racha: { grad: 'from-slate-600/95 to-slate-800/95 border-slate-400/50', emoji: '💔' },
+    info:  { grad: 'from-indigo-500/95 to-blue-500/95 border-indigo-300/50', emoji: '📥' },
   };
   const { grad, emoji } = config[mensaje.tipo] || config.exito;
   return (
@@ -523,10 +524,10 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
   return (
     <div
       onClick={() => onEdit(tarea)}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150 cursor-pointer
         ${tarea.completada
           ? 'bg-white/[0.03] border-white/5 opacity-60'
-          : 'bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09]'}
+          : 'bg-white/[0.06] border-white/10 hover:border-indigo-400/50 hover:bg-white/[0.14] active:border-indigo-400/60 active:bg-white/[0.16]'}
         ${recienCompletada ? 'scale-[1.02] ring-2 ring-emerald-400/40' : ''}
       `}
     >
@@ -560,24 +561,32 @@ function TaskCard({ tarea, carpetaNombre, carpetaColorClass, fechaBadge, esPendi
               <CalendarClock className="w-3 h-3" /> {fechaBadge}
             </span>
           )}
+        </div>
+
+        {/* Acciones agrupadas: separadas de los badges para que no se confundan con etiquetas */}
+        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(tarea); }}
+            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Editar
+          </button>
           {onMover && (
             <button
               onClick={(e) => { e.stopPropagation(); onMover(tarea.id); }}
-              className="flex items-center gap-1 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full hover:bg-emerald-500/20"
+              className="flex items-center gap-1 text-[11px] text-emerald-300 hover:text-emerald-200 px-2 py-1 rounded-lg hover:bg-emerald-500/10"
             >
-              {esPendiente ? 'Mover a hoy' : 'Enviar a pendientes'} <ArrowRight className="w-3 h-3" />
+              <ArrowRight className="w-3.5 h-3.5" /> {esPendiente ? 'Mover a hoy' : 'A pendientes'}
             </button>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(tarea.id); }}
+            className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 ml-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+          </button>
         </div>
       </div>
-
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(tarea.id); }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
-        aria-label="Eliminar tarea"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
     </div>
   );
 }
@@ -586,10 +595,10 @@ function ReminderCard({ recordatorio, categoriaNombre, categoriaColorClass, onTo
   return (
     <div
       onClick={() => onEdit(recordatorio)}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-150 cursor-pointer
         ${recordatorio.completado
           ? 'bg-white/[0.03] border-white/5 opacity-60'
-          : 'bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09]'}
+          : 'bg-white/[0.06] border-white/10 hover:border-indigo-400/50 hover:bg-white/[0.14] active:border-indigo-400/60 active:bg-white/[0.16]'}
       `}
     >
       <button
@@ -612,15 +621,22 @@ function ReminderCard({ recordatorio, categoriaNombre, categoriaColorClass, onTo
             <CalendarClock className="w-3 h-3" /> {formatFechaCorta(recordatorio.fecha)} · {recordatorio.hora}
           </span>
         </div>
-      </div>
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(recordatorio.id); }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
-        aria-label="Eliminar recordatorio"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(recordatorio); }}
+            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Editar
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(recordatorio.id); }}
+            className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 ml-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -632,25 +648,16 @@ function stripHtmlPreview(html, maxLen = 140) {
   return texto.length > maxLen ? texto.slice(0, maxLen) + '…' : texto;
 }
 
-function NotaCard({ nota, categoriaNombre, categoriaColorClass, onEdit, onDelete }) {
+function NotaCard({ nota, categoriaNombre, categoriaColorClass, onOpen }) {
   const preview = stripHtmlPreview(nota.contenido);
   return (
     <div
-      onClick={() => onEdit(nota)}
-      className="group relative flex flex-col gap-1.5 p-3 rounded-xl border bg-white/[0.06] border-white/10 hover:border-white/20 hover:bg-white/[0.09] cursor-pointer transition-all duration-300"
+      onClick={() => onOpen(nota)}
+      className="group relative flex flex-col gap-1.5 p-3 rounded-xl border bg-white/[0.06] border-white/10 hover:border-indigo-400/50 hover:bg-white/[0.14] active:border-indigo-400/60 active:bg-white/[0.16] cursor-pointer transition-all duration-150"
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-100 break-words flex-1 min-w-0">
-          {nota.titulo || 'Sin título'}
-        </p>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(nota.id); }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
-          aria-label="Eliminar nota"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+      <p className="text-sm font-semibold text-slate-100 break-words">
+        {nota.titulo || 'Sin título'}
+      </p>
       {preview && <p className="text-xs text-slate-400 line-clamp-2">{preview}</p>}
       <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
         {categoriaNombre && <CategoriaBadge nombre={categoriaNombre} colorClass={categoriaColorClass} />}
@@ -786,14 +793,13 @@ export default function OrganizApp() {
   const [showSugerencia, setShowSugerencia] = useState(false);
   const [showGreetingPopup, setShowGreetingPopup] = useState(false);
   const [showRachaInfo, setShowRachaInfo] = useState(false);
-  const [showRetomar, setShowRetomar] = useState(false);
   const [showResumenSemanal, setShowResumenSemanal] = useState(false);
   const [archivadosAbiertos, setArchivadosAbiertos] = useState(false);
   const [greetingMsg, setGreetingMsg] = useState('');
   const [coachMsg, setCoachMsg] = useState(null);
   const [nuevoFestivo, setNuevoFestivo] = useState('');
-  const [pendientesAyer, setPendientesAyer] = useState([]);
-  const [seleccionRetomar, setSeleccionRetomar] = useState({});
+  const [showNotaView, setShowNotaView] = useState(false);
+  const [viewingNota, setViewingNota] = useState(null);
   const [mostrarNuevaCarpeta, setMostrarNuevaCarpeta] = useState(false);
   const [nombreNuevaCarpeta, setNombreNuevaCarpeta] = useState('');
   const [nuevaCarpetaSettings, setNuevaCarpetaSettings] = useState('');
@@ -829,15 +835,27 @@ export default function OrganizApp() {
 
   const nombreMostrado = nombre.trim() || 'Humano';
 
-  const mostrarCoach = useCallback((texto, tipo) => {
-    setCoachMsg({ texto: formatMsg(texto, { nombre: nombreMostrado }), tipo, id: Date.now() + Math.random() });
-  }, [nombreMostrado]);
+  const coachQueueRef = useRef([]);
+  const coachMostrandoRef = useRef(false);
 
-  useEffect(() => {
-    if (!coachMsg) return;
-    const t = setTimeout(() => setCoachMsg(null), 3000);
-    return () => clearTimeout(t);
-  }, [coachMsg]);
+  const avanzarColaCoach = useCallback(() => {
+    const siguiente = coachQueueRef.current.shift();
+    if (!siguiente) {
+      coachMostrandoRef.current = false;
+      setCoachMsg(null);
+      return;
+    }
+    coachMostrandoRef.current = true;
+    setCoachMsg(siguiente);
+    setTimeout(avanzarColaCoach, 3400);
+  }, []);
+
+  const mostrarCoach = useCallback((texto, tipo) => {
+    coachQueueRef.current.push({ texto: formatMsg(texto, { nombre: nombreMostrado }), tipo, id: Date.now() + Math.random() });
+    if (!coachMostrandoRef.current) {
+      avanzarColaCoach();
+    }
+  }, [nombreMostrado, avanzarColaCoach]);
 
   const lanzarSaludoSiCorresponde = useCallback((forzar = false) => {
     const hoyStr = hoyISO();
@@ -905,12 +923,18 @@ export default function OrganizApp() {
       }
 
       if (pendientesAyerCalc.length > 0) {
-        setPendientesAyer(pendientesAyerCalc);
-        setSeleccionRetomar({});
-        setShowRetomar(true);
+        mostrarCoach(
+          `Ayer quedaron ${pendientesAyerCalc.length} tarea${pendientesAyerCalc.length === 1 ? '' : 's'} sin terminar. Ya están esperándote en Pendientes, {nombre}.`,
+          'info'
+        );
       }
 
-      return prevTareas.filter(t => t.fecha !== fechaAnterior);
+      // Las completadas de ayer ya quedaron archivadas en el historial (arriba) y se quitan
+      // de la lista activa. Las que NO se completaron nunca desaparecen: pasan directo al
+      // cajón de Pendientes (sin fecha), listas para que las saques de ahí cuando quieras.
+      return prevTareas
+        .filter(t => !(t.fecha === fechaAnterior && t.completada))
+        .map(t => (t.fecha === fechaAnterior && !t.completada) ? { ...t, fecha: null } : t);
     });
 
     setLastActiveDate(fechaNueva);
@@ -1348,6 +1372,11 @@ export default function OrganizApp() {
     setShowNotaModal(true);
   };
 
+  const abrirVistaNota = (nota) => {
+    setViewingNota(nota);
+    setShowNotaView(true);
+  };
+
   const cerrarModalNota = () => {
     setShowNotaModal(false);
     setEditingNotaId(null);
@@ -1381,6 +1410,7 @@ export default function OrganizApp() {
   };
 
   const eliminarNota = (id) => {
+    if (!window.confirm('¿Eliminar esta nota? No se puede deshacer.')) return;
     setNotas(prev => prev.filter(n => n.id !== id));
   };
 
@@ -1474,45 +1504,8 @@ export default function OrganizApp() {
   };
 
   const eliminarTarea = (id) => {
+    if (!window.confirm('¿Eliminar esta tarea? No se puede deshacer.')) return;
     setTareas(prev => prev.filter(t => t.id !== id));
-  };
-
-  const copiarTareasRetomar = (lista) => {
-    const nuevas = lista.map(t => ({
-      ...t,
-      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      fecha: hoyISO(),
-      completada: false,
-    }));
-    setTareas(prev => [...prev, ...nuevas]);
-    setShowRetomar(false);
-    setPendientesAyer([]);
-    setSeleccionRetomar({});
-  };
-
-  const copiarSeleccionadasRetomar = () => {
-    const seleccionadas = pendientesAyer.filter(t => seleccionRetomar[t.id] ?? true);
-    copiarTareasRetomar(seleccionadas);
-  };
-
-  const copiarTodasRetomar = () => copiarTareasRetomar(pendientesAyer);
-
-  const descartarRetomar = () => {
-    setShowRetomar(false);
-    setPendientesAyer([]);
-    setSeleccionRetomar({});
-  };
-
-  // En vez de traerla a hoy o descartarla, la manda directo al cajón de Pendientes (sin fecha)
-  const enviarPendienteAyerABacklog = (tarea) => {
-    const nueva = {
-      ...tarea,
-      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      fecha: null,
-      completada: false,
-    };
-    setTareas(prev => [...prev, nueva]);
-    setPendientesAyer(prev => prev.filter(t => t.id !== tarea.id));
   };
 
   const abrirNuevoRecordatorio = () => {
@@ -1570,6 +1563,7 @@ export default function OrganizApp() {
   };
 
   const eliminarRecordatorio = (id) => {
+    if (!window.confirm('¿Eliminar este recordatorio? No se puede deshacer.')) return;
     setRecordatorios(prev => prev.filter(r => r.id !== id));
   };
 
@@ -1897,53 +1891,51 @@ export default function OrganizApp() {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2 overflow-x-auto">
+            <div className="flex items-center gap-1.5 mb-2 bg-white/[0.03] p-1 rounded-2xl border border-white/5">
+              <button
+                onClick={() => setVistaTareas('tablero')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-sm font-medium transition
+                  ${vistaTareas === 'tablero' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <LayoutGrid className="w-4 h-4 shrink-0" /> Tablero
+              </button>
+              <button
+                onClick={() => setVistaTareas('lista')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-sm font-medium transition
+                  ${vistaTareas === 'lista' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <ListChecks className="w-4 h-4 shrink-0" /> Lista
+              </button>
+              <button
+                onClick={() => setVistaTareas('pendientes')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-sm font-medium transition relative
+                  ${vistaTareas === 'pendientes' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Inbox className="w-4 h-4 shrink-0" /> Pendientes
+                {tareasPendientesVisibles.length > 0 && (
+                  <span className="min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {tareasPendientesVisibles.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {vistaTareas !== 'pendientes' && (
+              <div className="flex items-center gap-2 mb-4">
                 <button
-                  onClick={() => setVistaTareas('tablero')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
-                    ${vistaTareas === 'tablero' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                  onClick={() => setShowSugerencia(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
                 >
-                  <LayoutGrid className="w-4 h-4" /> Tablero
+                  <ListOrdered className="w-4 h-4" /> Orden sugerido
                 </button>
                 <button
-                  onClick={() => setVistaTareas('lista')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition
-                    ${vistaTareas === 'lista' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                  onClick={() => setShowResumenSemanal(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition"
                 >
-                  <ListChecks className="w-4 h-4" /> Lista
-                </button>
-                <button
-                  onClick={() => setVistaTareas('pendientes')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition relative
-                    ${vistaTareas === 'pendientes' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  <Inbox className="w-4 h-4" /> Pendientes
-                  {tareasPendientesVisibles.length > 0 && (
-                    <span className="ml-0.5 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {tareasPendientesVisibles.length}
-                    </span>
-                  )}
+                  <BarChart3 className="w-4 h-4" /> Resumen
                 </button>
               </div>
-              {vistaTareas !== 'pendientes' && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setShowResumenSemanal(true)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition"
-                    aria-label="Ver resumen semanal"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowSugerencia(true)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
-                  >
-                    <ListOrdered className="w-4 h-4" /> Orden
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
 
             {vistaTareas === 'tablero' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2144,8 +2136,7 @@ export default function OrganizApp() {
                   nota={n}
                   categoriaNombre={getCategoria(n.categoriaId)?.nombre}
                   categoriaColorClass={getCategoriaColorClass(n.categoriaId)}
-                  onEdit={abrirEditarNota}
-                  onDelete={eliminarNota}
+                  onOpen={abrirVistaNota}
                 />
               ))}
             </div>
@@ -2441,6 +2432,46 @@ export default function OrganizApp() {
         </Modal>
       )}
 
+      {showNotaView && viewingNota && (
+        <Modal titulo={viewingNota.titulo || 'Nota'} onClose={() => setShowNotaView(false)}>
+          <div className="space-y-4">
+            <div className="flex items-center flex-wrap gap-1.5">
+              {viewingNota.categoriaId && (
+                <CategoriaBadge
+                  nombre={getCategoria(viewingNota.categoriaId)?.nombre}
+                  colorClass={getCategoriaColorClass(viewingNota.categoriaId)}
+                />
+              )}
+              <span className="text-[11px] text-slate-500">
+                Editada el {formatFechaCorta(viewingNota.actualizado.split('T')[0])}
+              </span>
+            </div>
+
+            <div
+              className="text-sm text-slate-200 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic"
+              dangerouslySetInnerHTML={{
+                __html: viewingNota.contenido || '<p style="color:#64748b;font-style:italic;">Sin contenido.</p>',
+              }}
+            />
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => { setShowNotaView(false); abrirEditarNota(viewingNota); }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => { eliminarNota(viewingNota.id); setShowNotaView(false); }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showNotaModal && (
         <Modal titulo={editingNotaId ? 'Editar nota' : 'Nueva nota'} onClose={cerrarModalNota}>
           <div className="space-y-4">
@@ -2564,58 +2595,6 @@ export default function OrganizApp() {
           message={greetingMsg}
           onClose={() => setShowGreetingPopup(false)}
         />
-      )}
-
-      {showRetomar && pendientesAyer.length > 0 && (
-        <Modal titulo="¿Retomamos algo de ayer?" onClose={descartarRetomar}>
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500">
-              Estas tareas quedaron sin hacer ayer. Elige cuáles traer a hoy, mándalas a
-              Pendientes si no son para ahora, o descártalas sin culpa.
-            </p>
-            <div className="space-y-2">
-              {pendientesAyer.map(t => (
-                <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                  <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={seleccionRetomar[t.id] ?? true}
-                      onChange={e => setSeleccionRetomar(prev => ({ ...prev, [t.id]: e.target.checked }))}
-                      className="w-4 h-4 accent-indigo-500 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-100 break-words">{t.titulo}</p>
-                      <p className="text-[11px] text-slate-500">Prioridad {t.nivel}/5 · {formatDuracion(t.duracion)}</p>
-                    </div>
-                  </label>
-                  <button
-                    onClick={() => enviarPendienteAyerABacklog(t)}
-                    className="shrink-0 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-full hover:bg-emerald-500/20"
-                  >
-                    A pendientes
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={descartarRetomar}
-                className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-medium"
-              >
-                Descartar todas
-              </button>
-              <button
-                onClick={copiarSeleccionadasRetomar}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
-              >
-                Copiar seleccionadas
-              </button>
-            </div>
-            <button onClick={copiarTodasRetomar} className="w-full text-xs text-indigo-300 underline text-center py-1">
-              Copiar todas sin revisar
-            </button>
-          </div>
-        </Modal>
       )}
 
       {showResumenSemanal && (
