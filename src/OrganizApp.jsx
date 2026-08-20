@@ -270,10 +270,19 @@ function calcularAlertaJornada(horarioLaboral) {
   return `${String(alerta.getHours()).padStart(2, '0')}:${String(alerta.getMinutes()).padStart(2, '0')}`;
 }
 
-function ultimoDiaActivoSemana(horarioLaboral) {
-  const activos = ORDEN_DIAS.filter(d => horarioLaboral[d] && horarioLaboral[d].activo);
-  if (activos.length === 0) return null;
-  return activos[activos.length - 1];
+// ¿Ya pasó la hora en que normalmente empieza la jornada de hoy? (por defecto 8:00 si el día
+// no tiene horario activo configurado). Se usa para no procesar el cierre del día anterior
+// en plena madrugada si alguien trabajó hasta tarde — se espera a que "empiece" el nuevo día.
+function yaPasoHoraInicioDeHoy(horarioLaboral) {
+  const ahora = new Date();
+  const diaKey = DIAS_GETDAY[ahora.getDay()];
+  const horario = horarioLaboral[diaKey];
+  const horaInicio = (horario && horario.activo && horario.inicio) ? horario.inicio : '08:00';
+  const [h, m] = horaInicio.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return true;
+  const limite = new Date(ahora);
+  limite.setHours(h, m, 0, 0);
+  return ahora >= limite;
 }
 
 // Devuelve el lunes (YYYY-MM-DD) de la semana a la que pertenece fechaISO
@@ -701,7 +710,10 @@ function NotaContentEditor({ initialValue, onChange }) {
 function Modal({ titulo, onClose, children }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[slideUp_0.3s_ease-out]">
+      <div
+        className="w-full sm:max-w-md bg-slate-900/95 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-2xl animate-[slideUp_0.3s_ease-out]"
+        style={{ paddingBottom: 'max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem))' }}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">{titulo}</h2>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/10 text-slate-400">
@@ -782,7 +794,6 @@ export default function OrganizApp() {
   const [nuevoFestivo, setNuevoFestivo] = useState('');
   const [pendientesAyer, setPendientesAyer] = useState([]);
   const [seleccionRetomar, setSeleccionRetomar] = useState({});
-  const [resumenSemanal, setResumenSemanal] = useState(saved.resumenSemanal || null);
   const [mostrarNuevaCarpeta, setMostrarNuevaCarpeta] = useState(false);
   const [nombreNuevaCarpeta, setNombreNuevaCarpeta] = useState('');
   const [nuevaCarpetaSettings, setNuevaCarpetaSettings] = useState('');
@@ -851,27 +862,34 @@ export default function OrganizApp() {
 
   const procesarCierreDia = useCallback((fechaAnterior, fechaNueva) => {
     const libre = esDiaLibre(fechaAnterior, finDeSemanaLibre, festivosManual);
-    const diaKeyAnterior = DIAS_GETDAY[new Date(fechaAnterior + 'T00:00:00').getDay()];
-    const ultimoDia = ultimoDiaActivoSemana(horarioLaboral);
-    const esUltimoDiaSemana = ultimoDia !== null && diaKeyAnterior === ultimoDia;
 
     setTareas(prevTareas => {
       const tareasDeAyer = prevTareas.filter(t => t.fecha === fechaAnterior);
       const totalAyer = tareasDeAyer.reduce((s, t) => s + t.puntos, 0);
-      const completadoAyer = tareasDeAyer.filter(t => t.completada).reduce((s, t) => s + t.puntos, 0);
+      const completadasAyer = tareasDeAyer.filter(t => t.completada);
+      const completadoAyer = completadasAyer.reduce((s, t) => s + t.puntos, 0);
       const metaAyer = totalAyer * metaPorcentaje / 100;
       const huboTareas = totalAyer > 0;
       const cumplida = huboTareas && completadoAyer >= metaAyer;
       const pendientesAyerCalc = tareasDeAyer.filter(t => !t.completada);
 
       if (huboTareas) {
-        setHistorial(prevHist => {
-          const nuevoHistorial = [
-            ...prevHist,
-            { fecha: fechaAnterior, puntosObtenidos: completadoAyer, puntosMeta: Math.round(metaAyer), cumplida, libre },
-          ].slice(-90);
-          return nuevoHistorial;
-        });
+        setHistorial(prevHist => [
+          ...prevHist,
+          {
+            fecha: fechaAnterior,
+            puntosObtenidos: completadoAyer,
+            puntosMeta: Math.round(metaAyer),
+            cumplida,
+            libre,
+            // Se guarda el detalle de lo completado ese día para poder armar el resumen
+            // semanal (reporte de actividades) más adelante, sin depender de las tareas
+            // en vivo que ya se van a archivar.
+            tareasCompletadas: completadasAyer.map(t => ({
+              titulo: t.titulo, puntos: t.puntos, nivel: t.nivel, carpetaId: t.carpetaId,
+            })),
+          },
+        ].slice(-90));
 
         if (!libre) {
           setRacha(prevRacha => {
@@ -886,60 +904,32 @@ export default function OrganizApp() {
         }
       }
 
-      // Resumen semanal: se acumula día a día (lunes a domingo) y se reinicia al empezar el lunes
-      setResumenSemanal(prevResumen => {
-        const lunesAnterior = lunesDeLaSemana(fechaAnterior);
-        const base = (prevResumen && prevResumen.semanaInicio === lunesAnterior)
-          ? prevResumen
-          : { semanaInicio: lunesAnterior, puntosTotales: 0, diasCumplidos: 0, diasTotal: 0, pendientesCount: 0 };
-
-        const finalizado = huboTareas
-          ? {
-              semanaInicio: lunesAnterior,
-              puntosTotales: base.puntosTotales + completadoAyer,
-              diasCumplidos: base.diasCumplidos + (cumplida ? 1 : 0),
-              diasTotal: base.diasTotal + 1,
-              pendientesCount: pendientesAyerCalc.length,
-            }
-          : { ...base, pendientesCount: pendientesAyerCalc.length };
-
-        if (esUltimoDiaSemana) {
-          setShowResumenSemanal(true);
-        }
-
-        // Si el nuevo día es lunes, arrancamos en ceros la semana que empieza hoy
-        const nuevaEsLunes = DIAS_GETDAY[new Date(fechaNueva + 'T00:00:00').getDay()] === 'lunes';
-        return nuevaEsLunes
-          ? { semanaInicio: fechaNueva, puntosTotales: 0, diasCumplidos: 0, diasTotal: 0, pendientesCount: 0 }
-          : finalizado;
-      });
-
       if (pendientesAyerCalc.length > 0) {
         setPendientesAyer(pendientesAyerCalc);
         setSeleccionRetomar({});
-        if (!esUltimoDiaSemana) setShowRetomar(true);
+        setShowRetomar(true);
       }
 
       return prevTareas.filter(t => t.fecha !== fechaAnterior);
     });
 
     setLastActiveDate(fechaNueva);
-  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual, horarioLaboral]);
+  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual]);
 
   useEffect(() => {
     const check = () => {
       const hoyStr = hoyISO();
-      if (hoyStr !== lastActiveDate) {
+      if (hoyStr !== lastActiveDate && yaPasoHoraInicioDeHoy(horarioLaboral)) {
         procesarCierreDia(lastActiveDate, hoyStr);
       }
-      if (onboardingCompleto && hoyStr !== lastGreetingDate) {
+      if (onboardingCompleto && hoyStr !== lastGreetingDate && yaPasoHoraInicioDeHoy(horarioLaboral)) {
         lanzarSaludoSiCorresponde(false);
       }
     };
     check();
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
-  }, [lastActiveDate, lastGreetingDate, onboardingCompleto, procesarCierreDia, lanzarSaludoSiCorresponde]);
+  }, [lastActiveDate, lastGreetingDate, onboardingCompleto, procesarCierreDia, lanzarSaludoSiCorresponde, horarioLaboral]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1002,10 +992,10 @@ export default function OrganizApp() {
   const construirEstadoCompleto = useCallback(() => ({
     tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje,
     lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
-    finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada, resumenSemanal,
+    finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada,
   }), [tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
       nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
-      horarioLaboral, ultimaAlertaJornada, resumenSemanal]);
+      horarioLaboral, ultimaAlertaJornada]);
 
   // Snapshot de cada sección, recalculado en cada render (no solo dentro de un efecto) para que,
   // sin importar el orden de ejecución, siempre haya datos frescos disponibles de inmediato.
@@ -1014,7 +1004,7 @@ export default function OrganizApp() {
     recordatorios: { recordatorios },
     notas: { notas },
     categorias: { categorias },
-    progreso: { historial, racha, mejorRacha, resumenSemanal, ultimaAlertaJornada },
+    progreso: { historial, racha, mejorRacha, ultimaAlertaJornada },
     config: {
       metaPorcentaje, nombre, finDeSemanaLibre, festivosManual, horarioLaboral,
       onboardingCompleto, lastActiveDate, lastGreetingDate,
@@ -1043,7 +1033,6 @@ export default function OrganizApp() {
         setHistorial(data.historial || []);
         setRacha(data.racha || 0);
         setMejorRacha(data.mejorRacha ?? data.racha ?? 0);
-        setResumenSemanal(data.resumenSemanal || null);
         setUltimaAlertaJornada(data.ultimaAlertaJornada || '');
         break;
       case 'config':
@@ -1149,7 +1138,7 @@ export default function OrganizApp() {
   useEffect(() => {
     programarPushSeccion('progreso');
     return () => { if (pushTimeoutsRef.current.progreso) clearTimeout(pushTimeoutsRef.current.progreso); };
-  }, [historial, racha, mejorRacha, resumenSemanal, ultimaAlertaJornada, programarPushSeccion]);
+  }, [historial, racha, mejorRacha, ultimaAlertaJornada, programarPushSeccion]);
 
   useEffect(() => {
     programarPushSeccion('config');
@@ -1712,6 +1701,45 @@ export default function OrganizApp() {
     return historial.reduce((max, h) => (!max || h.puntosObtenidos > max.puntosObtenidos) ? h : max, null);
   }, [historial]);
 
+  // Resumen semanal calculado EN VIVO (no un acumulado guardado): combina los días ya
+  // cerrados de esta semana (con su detalle de actividades guardado en el historial) más
+  // el progreso de HOY mismo, para que sirva de reporte real en cualquier momento —
+  // por ejemplo, viernes a las 5pm, sin tener que esperar a que "cierre" el día.
+  const resumenSemanalActual = useMemo(() => {
+    const lunes = lunesDeLaSemana(hoy);
+    const diasSemana = historial.filter(h => h.fecha >= lunes && h.fecha <= hoy);
+
+    const actividades = [];
+    let puntosTotales = 0;
+    let diasCumplidos = 0;
+    let diasTotal = 0;
+
+    diasSemana.forEach(h => {
+      puntosTotales += h.puntosObtenidos;
+      if (!h.libre) {
+        diasTotal += 1;
+        if (h.cumplida) diasCumplidos += 1;
+      }
+      (h.tareasCompletadas || []).forEach(t => actividades.push({ ...t, fecha: h.fecha }));
+    });
+
+    const completadasHoy = tareasHoy.filter(t => t.completada);
+    puntosTotales += completadasHoy.reduce((s, t) => s + t.puntos, 0);
+    completadasHoy.forEach(t => actividades.push({
+      titulo: t.titulo, puntos: t.puntos, nivel: t.nivel, carpetaId: t.carpetaId, fecha: hoy,
+    }));
+
+    const hoyEsLibre = esDiaLibre(hoy, finDeSemanaLibre, festivosManual);
+    if (!hoyEsLibre && totalPuntosHoy > 0) {
+      diasTotal += 1;
+      if (progresoPct >= 100) diasCumplidos += 1;
+    }
+
+    actividades.sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    return { semanaInicio: lunes, puntosTotales, diasCumplidos, diasTotal, actividades };
+  }, [historial, hoy, tareasHoy, totalPuntosHoy, progresoPct, finDeSemanaLibre, festivosManual]);
+
   if (!onboardingCompleto) {
     return (
       <SapoOnboardingScreen
@@ -1789,7 +1817,7 @@ export default function OrganizApp() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pb-28 pt-4">
+      <main className="max-w-3xl mx-auto px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 7rem)' }}>
 
         <div className="flex items-center gap-1 mb-4 bg-white/[0.03] p-1 rounded-2xl border border-white/5">
           <button
@@ -1899,12 +1927,21 @@ export default function OrganizApp() {
                 </button>
               </div>
               {vistaTareas !== 'pendientes' && (
-                <button
-                  onClick={() => setShowSugerencia(true)}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
-                >
-                  <ListOrdered className="w-4 h-4" /> Orden
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setShowResumenSemanal(true)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition"
+                    aria-label="Ver resumen semanal"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowSugerencia(true)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition"
+                  >
+                    <ListOrdered className="w-4 h-4" /> Orden
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2119,7 +2156,10 @@ export default function OrganizApp() {
       {showFabMenu && (
         <div className="fixed inset-0 z-20" onClick={() => setShowFabMenu(false)} />
       )}
-      <div className="fixed bottom-6 right-5 z-30 flex flex-col items-end gap-3">
+      <div
+        className="fixed right-5 z-30 flex flex-col items-end gap-3"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
+      >
         {showFabMenu && (
           <>
             <button
@@ -2578,45 +2618,53 @@ export default function OrganizApp() {
         </Modal>
       )}
 
-      {showResumenSemanal && resumenSemanal && (
+      {showResumenSemanal && (
         <Modal titulo="Resumen semanal" onClose={() => setShowResumenSemanal(false)}>
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 -mt-1">
-              Semana desde el {formatFechaCorta(resumenSemanal.semanaInicio)} · se reinicia cada lunes.
+              Semana desde el {formatFechaCorta(resumenSemanalActual.semanaInicio)} hasta hoy · incluye lo de hoy mismo, en vivo.
             </p>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
               <BarChart3 className="w-8 h-8 text-indigo-300 shrink-0" />
               <div>
-                <p className="text-lg font-bold text-white leading-none">{resumenSemanal.puntosTotales} pts esta semana</p>
+                <p className="text-lg font-bold text-white leading-none">{resumenSemanalActual.puntosTotales} pts esta semana</p>
                 <p className="text-xs text-slate-400 mt-1.5">
-                  Cumpliste la meta {resumenSemanal.diasCumplidos} de {resumenSemanal.diasTotal} días registrados hasta ahora.
+                  Cumpliste la meta {resumenSemanalActual.diasCumplidos} de {resumenSemanalActual.diasTotal} días de esta semana.
                 </p>
               </div>
             </div>
 
-            {completadoHoy > 0 && (
-              <p className="text-[11px] text-slate-500 -mt-2">
-                + {completadoHoy} pts de hoy, todavía sin confirmar (se suman cuando cierre el día).
-              </p>
-            )}
+            <div>
+              <p className="text-sm text-slate-300 font-medium mb-2">Actividades completadas</p>
+              {resumenSemanalActual.actividades.length === 0 ? (
+                <p className="text-xs text-slate-600 italic">Todavía no completas nada esta semana. Hay tiempo.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {resumenSemanalActual.actividades.map((a, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-xs bg-white/5 rounded-lg px-2.5 py-2">
+                      <div className="min-w-0">
+                        <p className="text-slate-200 truncate">{a.titulo}</p>
+                        <p className="text-slate-500 text-[11px]">{formatFechaCorta(a.fecha)}</p>
+                      </div>
+                      <span className="shrink-0 text-amber-300 font-medium">{a.puntos} pts</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            {resumenSemanal.pendientesCount > 0 ? (
+            {tareasPendientesBacklog.length > 0 && (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <p className="text-sm text-amber-200">
-                  Te quedaron {resumenSemanal.pendientesCount} tarea{resumenSemanal.pendientesCount === 1 ? '' : 's'} sin hacer del último día registrado.
+                  Tienes {tareasPendientesBacklog.length} tarea{tareasPendientesBacklog.length === 1 ? '' : 's'} en Pendientes (sin fecha o de otro día).
                 </p>
                 <button
-                  onClick={() => { setShowResumenSemanal(false); setShowRetomar(true); }}
-                  disabled={pendientesAyer.length === 0}
-                  className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold disabled:opacity-40"
+                  onClick={() => { setShowResumenSemanal(false); setActiveTab('tareas'); setVistaTareas('pendientes'); }}
+                  className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-semibold"
                 >
-                  Revisar pendientes
+                  Ver Pendientes
                 </button>
               </div>
-            ) : (
-              <p className="text-sm text-emerald-300 text-center py-2">
-                Vas sin nada pendiente por ahora. S.A.P.O. no tiene quejas (todavía).
-              </p>
             )}
           </div>
         </Modal>
@@ -2902,16 +2950,12 @@ export default function OrganizApp() {
               <p className="text-sm text-slate-300 font-medium flex items-center gap-1.5">
                 <BarChart3 className="w-4 h-4 text-indigo-300" /> Resumen semanal
               </p>
-              {resumenSemanal ? (
-                <button
-                  onClick={() => setShowResumenSemanal(true)}
-                  className="w-full py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-medium"
-                >
-                  Ver resumen de esta semana ({resumenSemanal.puntosTotales} pts hasta ahora)
-                </button>
-              ) : (
-                <p className="text-xs text-slate-600 italic">Aún no hay nada que resumir esta semana.</p>
-              )}
+              <button
+                onClick={() => { setShowSettings(false); setShowResumenSemanal(true); }}
+                className="w-full py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-medium"
+              >
+                Ver resumen de esta semana ({resumenSemanalActual.puntosTotales} pts hasta ahora)
+              </button>
             </div>
 
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
