@@ -102,78 +102,213 @@ function horarioLaboralPorDefecto() {
   };
 }
 
-const MSG_COMPLETAR = [
-  '¡Por fin hiciste algo útil hoy, {nombre}!',
-  'Wow, sobreviviste a esta tarea. Que alguien te dé una medalla.',
-  'Milagro: una tarea completada sin excusas de por medio.',
-  'Tu yo del futuro te lo agradece, {nombre}, aunque no lo merezcas del todo.',
-  'Increíble, cumpliste. Guárdalo en tu currículum de "logros inesperados".',
-  'Punto para ti, {nombre}. Solo uno, no te emociones.',
-  'Mira nada más, resultó que sí sabías hacer cosas.',
-  '¿Ves? No era tan difícil como tu procrastinación te hizo creer.',
-];
+const BOTS = {
+  sapo: {
+    id: 'sapo',
+    nombre: 'S.A.P.O.',
+    subtitulo: 'Supervisor Autónomo para Procrastinadores Obligados',
+    emoji: '🐸',
+  },
+  rana: {
+    id: 'rana',
+    nombre: 'R.A.N.A.',
+    subtitulo: 'Robot Ayudante para Notas y Actividades',
+    emoji: '🌿',
+  },
+};
 
-const MSG_ROAST = [
-  'Tu procrastinación debería ser deporte olímpico, {nombre}.',
-  'El futuro tú te está odiando ahora mismo.',
-  'Esa tarea no se va a hacer sola, pero tú tampoco ayudas mucho.',
-  'Posponer: tu talento oculto más desarrollado.',
-  '"Después lo hago", dijiste ayer también.',
-  'A este ritmo tu racha va a durar menos que tus propósitos de enero.',
-  'La procrastinación te manda saludos, {nombre}, parece que son íntimos.',
-  'Aplazaste otra vez. Impresionante consistencia... en lo malo.',
-];
+const MSG_COMPLETAR = {
+  sapo: [
+    '¡Por fin hiciste algo útil hoy, {nombre}!',
+    'Wow, sobreviviste a esta tarea. Que alguien te dé una medalla.',
+    'Milagro: una tarea completada sin excusas de por medio.',
+    'Tu yo del futuro te lo agradece, {nombre}, aunque no lo merezcas del todo.',
+    'Increíble, cumpliste. Guárdalo en tu currículum de "logros inesperados".',
+    'Punto para ti, {nombre}. Solo uno, no te emociones.',
+    'Mira nada más, resultó que sí sabías hacer cosas.',
+    '¿Ves? No era tan difícil como tu procrastinación te hizo creer.',
+    'Una tarea menos, {nombre}. El mundo sigue girando, sorprendentemente.',
+    'Lo lograste. Avisa a los medios, o mejor no, que no exageren.',
+    'Lo hiciste sin que te lo recordara tres veces. Estoy casi orgulloso.',
+    '{nombre}, esto merece un aplauso discreto. Muy discreto.',
+    'Tarea completada. La procrastinación tomó un día libre, al parecer.',
+    'Nada mal, {nombre}. Para ser tú, claro.',
+    '{nombre}, cumpliste. Ahora intenta que no sea un evento único en tu vida.',
+    'Se hizo. No sé cómo, pero se hizo.',
+    'Uno más para la lista de "cosas que sí terminaste". Corta, pero existe.',
+    '¡Boom! Tarea fuera del camino. Ahora repite el truco.',
+  ],
+  rana: [
+    '¡Excelente trabajo, {nombre}! Un paso más cerca de tu meta. 🌟',
+    '¡Lo lograste! Cada tarea completada cuenta, y esta cuenta mucho.',
+    '¡Bien hecho, {nombre}! Sigue así, vas por buen camino.',
+    'Otra tarea lista. Tu esfuerzo de hoy vale la pena.',
+    '¡Genial! Completar esto te acerca a un gran día.',
+    '{nombre}, eso fue estupendo. Sigue construyendo este impulso.',
+    '¡Felicidades! Pequeños pasos como este suman grandes logros.',
+    'Una tarea menos en tu lista, {nombre}. ¡Vas muy bien!',
+    '¡Así se hace! Tu constancia está dando frutos.',
+    'Cada tarea completada es una victoria. ¡Celébrala, {nombre}!',
+    '¡Excelente! Estás construyendo un gran hábito de productividad.',
+    '{nombre}, tu dedicación hoy es admirable. ¡Sigue adelante!',
+    '¡Bien jugado! Un paso más hacia tus objetivos.',
+    'Terminaste otra tarea. Eso merece una sonrisa, {nombre}.',
+    '¡Lo conseguiste! Sigue con ese ritmo, vas genial.',
+  ],
+};
 
-const MSG_RACHA_PERDIDA = [
-  'Tu racha murió, {nombre}. Que descanse en paz, duró lo que un propósito de año nuevo.',
-  'Racha reiniciada a 0. Como tus ganas de esforzarte, aparentemente.',
-  'Se rompió la racha. Un momento de silencio por tu disciplina.',
-  'Racha: 0. Motivación: también 0. Vamos, se puede reconstruir.',
-  'Perdiste la racha, pero al menos eres consistente... en perderla.',
-];
+const MSG_ROAST = {
+  sapo: [
+    'Tu procrastinación debería ser deporte olímpico, {nombre}.',
+    'El futuro tú te está odiando ahora mismo.',
+    'Esa tarea no se va a hacer sola, pero tú tampoco ayudas mucho.',
+    'Posponer: tu talento oculto más desarrollado.',
+    '"Después lo hago", dijiste ayer también.',
+    'A este ritmo tu racha va a durar menos que tus propósitos de enero.',
+    'La procrastinación te manda saludos, {nombre}, parece que son íntimos.',
+    'Aplazaste otra vez. Impresionante consistencia... en lo malo.',
+    '{nombre}, desmarcaste eso más rápido de lo que lo marcaste. Todo un récord.',
+    'Ah, cambiaste de opinión. Tu compromiso es... conmovedor.',
+    'Esa tarea te está mirando raro ahora, {nombre}.',
+    'Vas y vienes como el wifi de tu vecino. Poco confiable.',
+    'Otra vez no, {nombre}. En serio, otra vez no.',
+    'Desmarcado. La procrastinación sonríe en algún lugar.',
+    '{nombre}, tu determinación tiene la consistencia de un flan.',
+  ],
+  rana: [
+    'No pasa nada, {nombre}. Puedes retomarla cuando estés listo.',
+    'Está bien tomarse un momento. Vuelve a intentarlo cuando puedas.',
+    'A veces cambiamos de plan, {nombre}. Sin problema, sigue adelante.',
+    'Sin prisa. Esa tarea seguirá ahí esperándote.',
+    'Todo bien, {nombre}. Lo importante es seguir intentándolo.',
+    'No te preocupes, mañana es una nueva oportunidad.',
+    '{nombre}, tómate tu tiempo. Vas a lograrlo cuando estés listo.',
+    'Está bien, no todos los días son iguales. ¡Sigue adelante!',
+  ],
+};
 
-const MSG_META_CUMPLIDA = [
-  '¡Meta diaria cumplida! Los milagros sí existen, {nombre}.',
-  'Llegaste a la meta. Alguien avise a los periódicos.',
-  'Meta del día superada. Tu procrastinación descansa hoy, no te acostumbres.',
-  '¡Lo lograste, {nombre}! Guarda esta racha de buen comportamiento, no es común.',
-];
+const MSG_RACHA_PERDIDA = {
+  sapo: [
+    'Tu racha murió, {nombre}. Que descanse en paz, duró lo que un propósito de año nuevo.',
+    'Racha reiniciada a 0. Como tus ganas de esforzarte, aparentemente.',
+    'Se rompió la racha. Un momento de silencio por tu disciplina.',
+    'Racha: 0. Motivación: también 0. Vamos, se puede reconstruir.',
+    'Perdiste la racha, pero al menos eres consistente... en perderla.',
+    'Y así, sin más, tu racha se fue. Como tus buenas intenciones.',
+    '{nombre}, tu racha tuvo una muerte silenciosa. Nadie la vio venir, excepto yo.',
+    'De vuelta a cero. Al menos ya sabes el camino de regreso.',
+  ],
+  rana: [
+    'Tu racha se reinició, {nombre}, pero eso no borra todo lo que ya lograste.',
+    'Empezar de nuevo también es parte del camino. ¡Tú puedes, {nombre}!',
+    'No pasa nada. Cada racha nueva es una oportunidad fresca.',
+    '{nombre}, lo importante es seguir intentándolo. Vamos de nuevo.',
+    'Una pausa no define tu progreso. ¡Adelante, se puede reconstruir!',
+  ],
+};
 
-const MENSAJES_SAPO = [
-  'Buenos días, {nombre}. Aquí S.A.P.O., reportándome para vigilar que hoy no seas un desastre... otra vez.',
-  '{nombre}, otro día, otra oportunidad de fingir que tienes todo bajo control.',
-  'Alerta S.A.P.O.: se detectaron altos niveles de procrastinación en tu historial reciente, {nombre}. Hoy cambiemos eso, ¿o no?',
-  'Hola, {nombre}. Recuerda: el café no hace las tareas por ti, aunque lo intentes con fe ciega.',
-  '{nombre}, tu yo de anoche te dejó tareas pendientes. Típico de él.',
-  'Buen día, {nombre}. S.A.P.O. reportando: cero excusas nuevas detectadas, así que toca trabajar con las viejas.',
-  '{nombre}, el sofá te espera esta noche. Pero antes hay que ganárselo.',
-  'S.A.P.O. al habla: hoy decide si eres productivo por convicción o por culpa. Ambas funcionan, {nombre}.',
-  'Otro amanecer, {nombre}. Otra racha que puedes romper o mantener. Sin presión (mentira, sí hay presión).',
-  '{nombre}, si esto fuera un examen de productividad, ¿lo estarías pasando? Piensa rápido.',
-];
+const MSG_META_CUMPLIDA = {
+  sapo: [
+    '¡Meta diaria cumplida! Los milagros sí existen, {nombre}.',
+    'Llegaste a la meta. Alguien avise a los periódicos.',
+    'Meta del día superada. Tu procrastinación descansa hoy, no te acostumbres.',
+    '¡Lo lograste, {nombre}! Guarda esta racha de buen comportamiento, no es común.',
+    'Meta cumplida. Hasta yo estoy sorprendido, y eso casi nunca pasa.',
+    '{nombre}, cumpliste la meta. Disfruta este momento, es raro.',
+    'Meta lista. El sofá te espera con los brazos abiertos, te lo ganaste.',
+  ],
+  rana: [
+    '¡Meta del día cumplida, {nombre}! Estás haciendo un trabajo increíble.',
+    '¡Lo lograste! Tu esfuerzo de hoy dio resultado.',
+    '¡Felicidades, {nombre}! Cumpliste tu meta diaria, disfruta el logro.',
+    'Meta alcanzada. Eres imparable hoy, {nombre}.',
+    '¡Excelente día! Cumpliste todo lo que te propusiste.',
+  ],
+};
 
-const MSG_ONBOARDING = '¡Hola! Soy S.A.P.O., Supervisor Autónomo para Procrastinadores Obligados. Alguien tenía que vigilar tu productividad, y adivina a quién le tocó. Bienvenido a OrganizApp: aquí organizamos tus pendientes, contamos tus rachas y, cuando haga falta, te lo restregamos en la cara. Antes de arrancar, dime algo: ¿cómo te llamas?';
+const MSG_SALUDO_DIARIO = {
+  sapo: [
+    'Buenos días, {nombre}. Aquí S.A.P.O., reportándome para vigilar que hoy no seas un desastre... otra vez.',
+    '{nombre}, otro día, otra oportunidad de fingir que tienes todo bajo control.',
+    'Alerta S.A.P.O.: se detectaron altos niveles de procrastinación en tu historial reciente, {nombre}. Hoy cambiemos eso, ¿o no?',
+    'Hola, {nombre}. Recuerda: el café no hace las tareas por ti, aunque lo intentes con fe ciega.',
+    '{nombre}, tu yo de anoche te dejó tareas pendientes. Típico de él.',
+    'Buen día, {nombre}. S.A.P.O. reportando: cero excusas nuevas detectadas, así que toca trabajar con las viejas.',
+    '{nombre}, el sofá te espera esta noche. Pero antes hay que ganárselo.',
+    'S.A.P.O. al habla: hoy decide si eres productivo por convicción o por culpa. Ambas funcionan, {nombre}.',
+    'Otro amanecer, {nombre}. Otra racha que puedes romper o mantener. Sin presión (mentira, sí hay presión).',
+    '{nombre}, si esto fuera un examen de productividad, ¿lo estarías pasando? Piensa rápido.',
+    'S.A.P.O. reportando novedades: cero, {nombre}. Vamos a cambiar eso hoy.',
+    '{nombre}, cada día es una nueva oportunidad de decepcionarme un poco menos.',
+    'Buenos días. Hoy decide: ¿procrastinar con estilo, o simplemente hacer las cosas?',
+    '{nombre}, tu cama te extraña ya, pero primero hay pendientes.',
+    'S.A.P.O. presente. Vigilando, juzgando, y ocasionalmente ayudando.',
+    'Otro día, {nombre}. Otra oportunidad de sorprenderme, para bien, ojalá.',
+  ],
+  rana: [
+    '¡Buenos días, {nombre}! Hoy es un gran día para lograr grandes cosas.',
+    '¡Hola, {nombre}! R.A.N.A. está lista para ayudarte a organizar tu día.',
+    'Un nuevo día, {nombre}, lleno de posibilidades. ¡Vamos a aprovecharlo!',
+    '¡Buen día! Recuerda: cada pequeño paso cuenta. Tú puedes con esto.',
+    '{nombre}, hoy es una nueva oportunidad para brillar. ¡Empecemos!',
+    'R.A.N.A. reportando: todo listo para un día productivo, {nombre}.',
+    '¡Hola! Me alegra acompañarte hoy. Vamos a organizar tus pendientes juntos.',
+    'Buenos días, {nombre}. Confío en que hoy va a ser un gran día.',
+    'Un nuevo amanecer, nuevas metas. ¡Tú puedes lograrlo, {nombre}!',
+    '{nombre}, recuerda ser amable contigo mismo hoy mientras avanzas.',
+    '¡Buenos días! Estoy aquí para animarte en cada paso del camino.',
+    'Hoy es un buen día para empezar, {nombre}. ¡Vamos con todo!',
+  ],
+};
 
-const MSG_ONBOARDING_AUTH = 'Antes de que sigas procrastinando, hagamos esto oficial: crea una cuenta o inicia sesión. Así, aunque cambies de celular, de computador o hasta de vida, tus pendientes te van a seguir encontrando.';
+const MSG_ONBOARDING = {
+  sapo: '¡Hola! Soy S.A.P.O., Supervisor Autónomo para Procrastinadores Obligados. Alguien tenía que vigilar tu productividad, y adivina a quién le tocó. Bienvenido a OrganizApp: aquí organizamos tus pendientes, contamos tus rachas y, cuando haga falta, te lo restregamos en la cara. Antes de arrancar, dime algo: ¿cómo te llamas?',
+  rana: '¡Hola! Soy R.A.N.A., tu Robot Ayudante para Notas y Actividades. Estoy aquí para acompañarte a organizar tus tareas, celebrar tus logros y ayudarte a construir buenos hábitos, a tu ritmo. Bienvenido a OrganizApp. Antes de empezar, cuéntame: ¿cómo te llamas?',
+};
 
-const MSG_NOTIF_SAPO = [
-  (t) => `S.A.P.O. reportando: "${t}" sigue pendiente. No fue una sugerencia.`,
-  (t) => `Oye. "${t}". Sí, ahora. No después.`,
-  (t) => `Recordatorio de S.A.P.O.: "${t}" no se va a resolver solo, por más que lo ignores.`,
-  (t) => `"${t}" — o lo haces ya, o le sigues dando largas. Tú decides, yo solo aviso.`,
-];
+const MSG_ONBOARDING_AUTH = 'Antes de seguir, hagamos esto oficial: crea una cuenta o inicia sesión. Así, aunque cambies de celular, de computador o de dispositivo, tus datos te van a seguir encontrando.';
 
-const MSG_JORNADA_CUMPLIDA = [
-  'Última hora de la jornada, {nombre}, y ya cumpliste la meta de hoy. Milagro confirmado.',
-  'Con una hora por delante y la meta ya lista. Hoy sí te ganaste el sofá, {nombre}.',
-  'Meta cumplida antes de la última hora. S.A.P.O. está gratamente sorprendido, {nombre}.',
-];
+const MSG_NOTIF_RECORDATORIO = {
+  sapo: [
+    (t) => `S.A.P.O. reportando: "${t}" sigue pendiente. No fue una sugerencia.`,
+    (t) => `Oye. "${t}". Sí, ahora. No después.`,
+    (t) => `Recordatorio de S.A.P.O.: "${t}" no se va a resolver solo, por más que lo ignores.`,
+    (t) => `"${t}" — o lo haces ya, o le sigues dando largas. Tú decides, yo solo aviso.`,
+    (t) => `S.A.P.O. al habla: "${t}" no se resuelve mirándolo fijamente.`,
+  ],
+  rana: [
+    (t) => `¡Hola! No olvides: "${t}". ¡Tú puedes con esto!`,
+    (t) => `Recordatorio amistoso: es momento de "${t}". ¡Ánimo!`,
+    (t) => `R.A.N.A. te recuerda: "${t}" te está esperando. ¡Vamos!`,
+    (t) => `Un pequeño empujón: "${t}" sigue pendiente. ¡Tú puedes!`,
+  ],
+};
 
-const MSG_JORNADA_PENDIENTE = [
-  'Última hora de la jornada, {nombre}, y todavía te faltan {faltan} pts. Se puede, pero hay que moverse.',
-  'Queda una hora y la meta sigue lejos, {nombre}. Faltan {faltan} pts, el reloj no perdona.',
-  '{nombre}, última hora del día y aún debes {faltan} pts. Ahora o nunca.',
-];
+const MSG_JORNADA_CUMPLIDA = {
+  sapo: [
+    'Última hora de la jornada, {nombre}, y ya cumpliste la meta de hoy. Milagro confirmado.',
+    'Con una hora por delante y la meta ya lista. Hoy sí te ganaste el sofá, {nombre}.',
+    'Meta cumplida antes de la última hora. S.A.P.O. está gratamente sorprendido, {nombre}.',
+  ],
+  rana: [
+    'Última hora de la jornada, {nombre}, ¡y ya cumpliste tu meta! Excelente trabajo.',
+    'Con una hora por delante y meta cumplida. ¡Disfruta el resto del día, {nombre}!',
+    '¡Meta lograda antes de tiempo! Estoy muy orgullosa de ti, {nombre}.',
+  ],
+};
+
+const MSG_JORNADA_PENDIENTE = {
+  sapo: [
+    'Última hora de la jornada, {nombre}, y todavía te faltan {faltan} pts. Se puede, pero hay que moverse.',
+    'Queda una hora y la meta sigue lejos, {nombre}. Faltan {faltan} pts, el reloj no perdona.',
+    '{nombre}, última hora del día y aún debes {faltan} pts. Ahora o nunca.',
+  ],
+  rana: [
+    'Última hora de la jornada, {nombre}. Aún faltan {faltan} pts, ¡pero puedes lograrlo!',
+    'Queda poco tiempo y {faltan} pts por hacer. ¡Tú puedes, {nombre}!',
+    '{nombre}, última hora del día. {faltan} pts más y cumples tu meta. ¡Ánimo!',
+  ],
+};
 
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -248,7 +383,15 @@ function esDiaLibre(fechaISO, finDeSemanaLibre, festivosManual) {
   return false;
 }
 
-function mensajeRacha(racha) {
+function mensajeRacha(racha, bot) {
+  if (bot === 'rana') {
+    if (racha === 0) return 'Cada racha empieza en algún momento. ¡Hoy puede ser el día!';
+    if (racha < 3) return 'Vas arrancando muy bien. ¡Sigue así!';
+    if (racha < 7) return 'Ya casi una semana completa. ¡Excelente constancia!';
+    if (racha < 14) return 'Dos semanas de dedicación. ¡Impresionante, de verdad!';
+    if (racha < 30) return '¡Un mes casi completo! Tu disciplina es admirable.';
+    return '¡Racha legendaria! Eres un ejemplo de constancia.';
+  }
   if (racha === 0) return 'Cero. Nada. Vacío existencial productivo.';
   if (racha < 3) return 'Apenas arrancando. No cantes victoria todavía.';
   if (racha < 7) return 'Ya casi una semana. Sigue así antes de que se te suba a la cabeza.';
@@ -343,11 +486,40 @@ function SapoAvatar({ className }) {
   );
 }
 
+// R.A.N.A.: mismo cuerpo que S.A.P.O, pero sin gafas de sol, ojos grandes y amigables,
+// sonrisa más abierta y mejillas sonrosadas en vez de manchas — más "family friendly".
+function RanaAvatar({ className }) {
+  return (
+    <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="60" rx="38" ry="30" fill="#22c55e" />
+      <circle cx="30" cy="31" r="15" fill="#22c55e" />
+      <circle cx="70" cy="31" r="15" fill="#22c55e" />
+      <circle cx="30" cy="31" r="11" fill="#ffffff" />
+      <circle cx="70" cy="31" r="11" fill="#ffffff" />
+      <circle cx="32" cy="33" r="5.2" fill="#0f172a" />
+      <circle cx="68" cy="33" r="5.2" fill="#0f172a" />
+      <circle cx="30" cy="29" r="1.8" fill="#ffffff" />
+      <circle cx="66" cy="29" r="1.8" fill="#ffffff" />
+      <circle cx="43" cy="57" r="2.2" fill="#065f46" />
+      <circle cx="57" cy="57" r="2.2" fill="#065f46" />
+      <path d="M33 65 Q50 82 67 65" stroke="#065f46" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <circle cx="23" cy="66" r="4.8" fill="#f472b6" opacity="0.5" />
+      <circle cx="77" cy="66" r="4.8" fill="#f472b6" opacity="0.5" />
+    </svg>
+  );
+}
+
+function BotAvatar({ bot, className }) {
+  return bot === 'rana' ? <RanaAvatar className={className} /> : <SapoAvatar className={className} />;
+}
+
 function SapoOnboardingScreen({
   step, nombre, onNombreChange, onContinuar,
   authEmail, onAuthEmailChange, authPassword, onAuthPasswordChange,
   authLoading, authError, authAviso, onCrearCuenta, onIniciarSesion, onOmitirAuth,
+  botElegido, onElegirBot,
 }) {
+  const bot = BOTS[botElegido] || BOTS.sapo;
   return (
     <div className="fixed inset-0 z-50 min-h-screen w-full bg-gradient-to-br from-slate-950 via-emerald-950/30 to-slate-950 text-white overflow-y-auto">
       <style>{`
@@ -355,12 +527,12 @@ function SapoOnboardingScreen({
       `}</style>
       <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center animate-[fadeInUp_0.5s_ease-out_both]">
-          <SapoAvatar className="w-28 h-28 mb-5" />
-          <h1 className="text-xl font-bold text-emerald-300">S.A.P.O.</h1>
-          <p className="text-xs text-slate-500 mt-1 mb-6">Supervisor Autónomo para Procrastinadores Obligados</p>
 
-          {step === 'auth' ? (
+          {step === 'auth' && (
             <>
+              <SapoAvatar className="w-28 h-28 mb-5" />
+              <h1 className="text-xl font-bold text-emerald-300">OrganizApp</h1>
+              <p className="text-xs text-slate-500 mt-1 mb-6">Primero, lo primero</p>
               <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING_AUTH}</p>
               <input
                 autoFocus
@@ -401,9 +573,53 @@ function SapoOnboardingScreen({
                 Seguir sin cuenta por ahora
               </button>
             </>
-          ) : (
+          )}
+
+          {step === 'bot' && (
             <>
-              <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING}</p>
+              <div className="flex items-center gap-2 mb-5">
+                <SapoAvatar className="w-14 h-14" />
+                <RanaAvatar className="w-14 h-14" />
+              </div>
+              <h1 className="text-xl font-bold text-emerald-300">Elige a tu acompañante</h1>
+              <p className="text-sm text-slate-200 leading-relaxed mb-6 mt-2">
+                Ambos hacen exactamente lo mismo — organizan tus tareas, cuentan tu racha,
+                te avisan de recordatorios. La única diferencia es el tono. Puedes cambiarlo
+                después en Configuración si cambias de opinión.
+              </p>
+              <div className="w-full space-y-3">
+                <button
+                  onClick={() => onElegirBot('sapo')}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-emerald-400/50 hover:bg-white/10 text-left transition"
+                >
+                  <SapoAvatar className="w-14 h-14 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-emerald-300">S.A.P.O.</p>
+                    <p className="text-[10px] text-slate-500 mb-1 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
+                    <p className="text-xs text-slate-400 italic">"Ah, decidiste aparecer. Qué generoso de tu parte."</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => onElegirBot('rana')}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-sky-400/50 hover:bg-white/10 text-left transition"
+                >
+                  <RanaAvatar className="w-14 h-14 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-sky-300">R.A.N.A.</p>
+                    <p className="text-[10px] text-slate-500 mb-1 leading-tight">Robot Ayudante para Notas y Actividades</p>
+                    <p className="text-xs text-slate-400 italic">"¡Qué alegría verte! Vamos a organizar tu día juntos."</p>
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 'nombre' && (
+            <>
+              <BotAvatar bot={botElegido} className="w-28 h-28 mb-5" />
+              <h1 className="text-xl font-bold text-emerald-300">{bot.nombre}</h1>
+              <p className="text-xs text-slate-500 mt-1 mb-6">{bot.subtitulo}</p>
+              <p className="text-sm text-slate-200 leading-relaxed mb-6">{MSG_ONBOARDING[botElegido] || MSG_ONBOARDING.sapo}</p>
               <input
                 autoFocus
                 type="text"
@@ -428,7 +644,8 @@ function SapoOnboardingScreen({
   );
 }
 
-function SapoPopup({ message, onClose }) {
+function SapoPopup({ message, onClose, bot: botId }) {
+  const bot = BOTS[botId] || BOTS.sapo;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
@@ -440,10 +657,10 @@ function SapoPopup({ message, onClose }) {
       >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-3 min-w-0">
-            <SapoAvatar className="w-14 h-14 shrink-0" />
+            <BotAvatar bot={botId} className="w-14 h-14 shrink-0" />
             <div className="min-w-0 pt-0.5">
-              <p className="text-sm font-bold text-emerald-300 leading-none">S.A.P.O.</p>
-              <p className="text-[10px] text-slate-500 mt-1 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
+              <p className="text-sm font-bold text-emerald-300 leading-none">{bot.nombre}</p>
+              <p className="text-[10px] text-slate-500 mt-1 leading-tight">{bot.subtitulo}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 text-slate-500 shrink-0">
@@ -466,13 +683,21 @@ function SapoPopup({ message, onClose }) {
 
 function CoachToast({ mensaje }) {
   if (!mensaje) return null;
-  const config = {
+  const configSapo = {
     exito: { grad: 'from-emerald-500/95 to-teal-500/95 border-emerald-300/50', emoji: '🎉' },
     roast: { grad: 'from-rose-500/95 to-red-500/95 border-rose-300/50', emoji: '😈' },
     meta:  { grad: 'from-amber-400/95 to-orange-500/95 border-amber-200/50', emoji: '🏆' },
     racha: { grad: 'from-slate-600/95 to-slate-800/95 border-slate-400/50', emoji: '💔' },
     info:  { grad: 'from-indigo-500/95 to-blue-500/95 border-indigo-300/50', emoji: '📥' },
   };
+  const configRana = {
+    exito: { grad: 'from-emerald-500/95 to-teal-500/95 border-emerald-300/50', emoji: '🌟' },
+    roast: { grad: 'from-sky-500/95 to-blue-500/95 border-sky-300/50', emoji: '💧' },
+    meta:  { grad: 'from-amber-400/95 to-orange-500/95 border-amber-200/50', emoji: '🎉' },
+    racha: { grad: 'from-sky-600/95 to-cyan-700/95 border-sky-300/50', emoji: '🌱' },
+    info:  { grad: 'from-indigo-500/95 to-blue-500/95 border-indigo-300/50', emoji: '📋' },
+  };
+  const config = mensaje.bot === 'rana' ? configRana : configSapo;
   const { grad, emoji } = config[mensaje.tipo] || config.exito;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-6 pointer-events-none">
@@ -756,9 +981,10 @@ export default function OrganizApp() {
   const [metaPorcentaje, setMetaPorcentaje] = useState(saved.metaPorcentaje ?? 70);
   const [lastActiveDate, setLastActiveDate] = useState(saved.lastActiveDate || hoyISO());
   const [nombre, setNombre] = useState(saved.nombre || '');
+  const [botElegido, setBotElegido] = useState(saved.botElegido || 'sapo');
   const [lastGreetingDate, setLastGreetingDate] = useState(saved.lastGreetingDate || '');
   const [onboardingCompleto, setOnboardingCompleto] = useState(saved.onboardingCompleto ?? yaTeniaDatos);
-  const [onboardingStep, setOnboardingStep] = useState(() => syncDisponible ? 'auth' : 'nombre');
+  const [onboardingStep, setOnboardingStep] = useState(() => syncDisponible ? 'auth' : 'bot');
   const [finDeSemanaLibre, setFinDeSemanaLibre] = useState(saved.finDeSemanaLibre ?? true);
   const [festivosManual, setFestivosManual] = useState(saved.festivosManual || []);
   const [horarioLaboral, setHorarioLaboral] = useState(saved.horarioLaboral || horarioLaboralPorDefecto());
@@ -851,20 +1077,26 @@ export default function OrganizApp() {
   }, []);
 
   const mostrarCoach = useCallback((texto, tipo) => {
-    coachQueueRef.current.push({ texto: formatMsg(texto, { nombre: nombreMostrado }), tipo, id: Date.now() + Math.random() });
+    coachQueueRef.current.push({
+      texto: formatMsg(texto, { nombre: nombreMostrado }),
+      tipo,
+      bot: botElegido,
+      id: Date.now() + Math.random(),
+    });
     if (!coachMostrandoRef.current) {
       avanzarColaCoach();
     }
-  }, [nombreMostrado, avanzarColaCoach]);
+  }, [nombreMostrado, botElegido, avanzarColaCoach]);
 
   const lanzarSaludoSiCorresponde = useCallback((forzar = false) => {
     const hoyStr = hoyISO();
     if (forzar || lastGreetingDate !== hoyStr) {
-      setGreetingMsg(formatMsg(pickRandom(MENSAJES_SAPO), { nombre: nombreMostrado }));
+      const mensajes = MSG_SALUDO_DIARIO[botElegido] || MSG_SALUDO_DIARIO.sapo;
+      setGreetingMsg(formatMsg(pickRandom(mensajes), { nombre: nombreMostrado }));
       setShowGreetingPopup(true);
       if (!forzar) setLastGreetingDate(hoyStr);
     }
-  }, [lastGreetingDate, nombreMostrado]);
+  }, [lastGreetingDate, nombreMostrado, botElegido]);
 
   const completarOnboarding = () => {
     setOnboardingCompleto(true);
@@ -916,7 +1148,7 @@ export default function OrganizApp() {
               setMejorRacha(prevMejor => Math.max(prevMejor, nueva));
               return nueva;
             }
-            mostrarCoach(pickRandom(MSG_RACHA_PERDIDA), 'racha');
+            mostrarCoach(pickRandom(MSG_RACHA_PERDIDA[botElegido] || MSG_RACHA_PERDIDA.sapo), 'racha');
             return 0;
           });
         }
@@ -938,7 +1170,7 @@ export default function OrganizApp() {
     });
 
     setLastActiveDate(fechaNueva);
-  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual]);
+  }, [metaPorcentaje, mostrarCoach, finDeSemanaLibre, festivosManual, botElegido]);
 
   useEffect(() => {
     const check = () => {
@@ -961,6 +1193,7 @@ export default function OrganizApp() {
       const ahora = new Date();
       const hhmm = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
       const hoyStr = hoyISO();
+      const botActual = BOTS[botElegido] || BOTS.sapo;
 
       setRecordatorios(prev => {
         let huboMatch = false;
@@ -968,8 +1201,8 @@ export default function OrganizApp() {
           if (r.fecha === hoyStr && r.hora === hhmm && !r.notificado && !r.completado) {
             huboMatch = true;
             try {
-              new Notification('🐸 S.A.P.O. te recuerda', {
-                body: pickRandom(MSG_NOTIF_SAPO)(r.titulo),
+              new Notification(`${botActual.emoji} ${botActual.nombre} te recuerda`, {
+                body: pickRandom(MSG_NOTIF_RECORDATORIO[botElegido] || MSG_NOTIF_RECORDATORIO.sapo)(r.titulo),
               });
             } catch (e) { /* noop */ }
             return { ...r, notificado: true };
@@ -980,7 +1213,7 @@ export default function OrganizApp() {
       });
     }, 30000);
     return () => clearInterval(interval);
-  }, [notifPermiso]);
+  }, [notifPermiso, botElegido]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -998,27 +1231,28 @@ export default function OrganizApp() {
       const cumplida = totalHoy > 0 && completado >= meta;
 
       const msg = cumplida
-        ? formatMsg(pickRandom(MSG_JORNADA_CUMPLIDA), { nombre: nombreMostrado })
-        : formatMsg(pickRandom(MSG_JORNADA_PENDIENTE), { nombre: nombreMostrado, faltan: Math.max(Math.round(meta - completado), 0) });
+        ? formatMsg(pickRandom(MSG_JORNADA_CUMPLIDA[botElegido] || MSG_JORNADA_CUMPLIDA.sapo), { nombre: nombreMostrado })
+        : formatMsg(pickRandom(MSG_JORNADA_PENDIENTE[botElegido] || MSG_JORNADA_PENDIENTE.sapo), { nombre: nombreMostrado, faltan: Math.max(Math.round(meta - completado), 0) });
 
       setGreetingMsg(msg);
       setShowGreetingPopup(true);
       if (notifPermiso === 'granted') {
         try {
-          new Notification('🐸 S.A.P.O. — última hora de la jornada', { body: msg });
+          const botActual = BOTS[botElegido] || BOTS.sapo;
+          new Notification(`${botActual.emoji} ${botActual.nombre} — última hora de la jornada`, { body: msg });
         } catch (e) { /* noop */ }
       }
       setUltimaAlertaJornada(hoyStr);
     }, 30000);
     return () => clearInterval(interval);
-  }, [horarioLaboral, tareas, metaPorcentaje, ultimaAlertaJornada, notifPermiso, nombreMostrado]);
+  }, [horarioLaboral, tareas, metaPorcentaje, ultimaAlertaJornada, notifPermiso, nombreMostrado, botElegido]);
 
   const construirEstadoCompleto = useCallback(() => ({
     tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje,
-    lastActiveDate, nombre, lastGreetingDate, onboardingCompleto,
+    lastActiveDate, nombre, botElegido, lastGreetingDate, onboardingCompleto,
     finDeSemanaLibre, festivosManual, horarioLaboral, ultimaAlertaJornada,
   }), [tareas, carpetas, categorias, recordatorios, notas, historial, racha, mejorRacha, metaPorcentaje, lastActiveDate,
-      nombre, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
+      nombre, botElegido, lastGreetingDate, onboardingCompleto, finDeSemanaLibre, festivosManual,
       horarioLaboral, ultimaAlertaJornada]);
 
   // Snapshot de cada sección, recalculado en cada render (no solo dentro de un efecto) para que,
@@ -1030,7 +1264,7 @@ export default function OrganizApp() {
     categorias: { categorias },
     progreso: { historial, racha, mejorRacha, ultimaAlertaJornada },
     config: {
-      metaPorcentaje, nombre, finDeSemanaLibre, festivosManual, horarioLaboral,
+      metaPorcentaje, nombre, botElegido, finDeSemanaLibre, festivosManual, horarioLaboral,
       onboardingCompleto, lastActiveDate, lastGreetingDate,
     },
   };
@@ -1062,6 +1296,7 @@ export default function OrganizApp() {
       case 'config':
         setMetaPorcentaje(data.metaPorcentaje ?? 70);
         setNombre(data.nombre || '');
+        setBotElegido(data.botElegido || 'sapo');
         setFinDeSemanaLibre(data.finDeSemanaLibre ?? true);
         setFestivosManual(data.festivosManual || []);
         setHorarioLaboral(data.horarioLaboral || horarioLaboralPorDefecto());
@@ -1175,7 +1410,7 @@ export default function OrganizApp() {
   useEffect(() => {
     programarPushSeccion('config');
     return () => { if (pushTimeoutsRef.current.config) clearTimeout(pushTimeoutsRef.current.config); };
-  }, [metaPorcentaje, nombre, finDeSemanaLibre, festivosManual, horarioLaboral,
+  }, [metaPorcentaje, nombre, botElegido, finDeSemanaLibre, festivosManual, horarioLaboral,
       onboardingCompleto, lastActiveDate, lastGreetingDate, programarPushSeccion]);
 
   // Mientras la app está abierta en varios dispositivos con la misma cuenta, escucha cambios
@@ -1206,12 +1441,17 @@ export default function OrganizApp() {
     return () => { activo = false; cancelarSuscripcion(); };
   }, []);
 
-  // Durante el onboarding: en cuanto haya sesión (login/registro exitoso, o ya venía guardada), pasa al paso del nombre
+  // Durante el onboarding: en cuanto haya sesión (login/registro exitoso, o ya venía guardada), pasa a elegir bot
   useEffect(() => {
     if (session && onboardingStep === 'auth') {
-      setOnboardingStep('nombre');
+      setOnboardingStep('bot');
     }
   }, [session, onboardingStep]);
+
+  const elegirBot = (id) => {
+    setBotElegido(id);
+    setOnboardingStep('nombre');
+  };
 
   const handleCrearCuenta = async () => {
     setAuthError('');
@@ -1502,7 +1742,7 @@ export default function OrganizApp() {
     setTareas(nuevasTareas);
 
     if (seCompleta) {
-      mostrarCoach(pickRandom(MSG_COMPLETAR), 'exito');
+      mostrarCoach(pickRandom(MSG_COMPLETAR[botElegido] || MSG_COMPLETAR.sapo), 'exito');
 
       const hoyStr = hoyISO();
       const tareasHoyList = nuevasTareas.filter(t => t.fecha === hoyStr);
@@ -1512,10 +1752,10 @@ export default function OrganizApp() {
       const completadoAntes = completadoHoyPts - tarea.puntos;
 
       if (metaHoy > 0 && completadoAntes < metaHoy && completadoHoyPts >= metaHoy) {
-        setTimeout(() => mostrarCoach(pickRandom(MSG_META_CUMPLIDA), 'meta'), 1500);
+        setTimeout(() => mostrarCoach(pickRandom(MSG_META_CUMPLIDA[botElegido] || MSG_META_CUMPLIDA.sapo), 'meta'), 1500);
       }
     } else {
-      mostrarCoach(pickRandom(MSG_ROAST), 'roast');
+      mostrarCoach(pickRandom(MSG_ROAST[botElegido] || MSG_ROAST.sapo), 'roast');
     }
   };
 
@@ -1613,7 +1853,7 @@ export default function OrganizApp() {
     setShowGreetingPopup(false);
     setShowSettings(false);
     setOnboardingCompleto(false);
-    setOnboardingStep(syncDisponible ? 'auth' : 'nombre');
+    setOnboardingStep(syncDisponible ? 'auth' : 'bot');
   };
 
   const hoy = hoyISO();
@@ -1766,7 +2006,9 @@ export default function OrganizApp() {
         authAviso={authAviso}
         onCrearCuenta={handleCrearCuenta}
         onIniciarSesion={handleIniciarSesion}
-        onOmitirAuth={() => setOnboardingStep('nombre')}
+        onOmitirAuth={() => setOnboardingStep('bot')}
+        botElegido={botElegido}
+        onElegirBot={elegirBot}
       />
     );
   }
@@ -2580,7 +2822,7 @@ export default function OrganizApp() {
       )}
 
       {showSugerencia && (
-        <Modal titulo="Orden sugerido de S.A.P.O" onClose={() => setShowSugerencia(false)}>
+        <Modal titulo={`Orden sugerido de ${(BOTS[botElegido] || BOTS.sapo).nombre}`} onClose={() => setShowSugerencia(false)}>
           {ordenSugerido.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-6">
               No hay tareas pendientes hoy. O ya ganaste el día, o aún no has creado ninguna. Sospechoso.
@@ -2610,6 +2852,7 @@ export default function OrganizApp() {
         <SapoPopup
           message={greetingMsg}
           onClose={() => setShowGreetingPopup(false)}
+          bot={botElegido}
         />
       )}
 
@@ -2672,7 +2915,7 @@ export default function OrganizApp() {
               <Flame className="w-9 h-9 text-orange-400 shrink-0" />
               <div>
                 <p className="text-2xl font-bold text-white leading-none">{racha} {racha === 1 ? 'día' : 'días'}</p>
-                <p className="text-xs text-slate-400 mt-1.5">{mensajeRacha(racha)}</p>
+                <p className="text-xs text-slate-400 mt-1.5">{mensajeRacha(racha, botElegido)}</p>
               </div>
             </div>
 
@@ -2808,6 +3051,30 @@ export default function OrganizApp() {
                 placeholder="¿Cómo te llamamos?"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-base outline-none focus:border-indigo-400/60"
               />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-400 mb-1.5 block">Personalidad</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setBotElegido('sapo')}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition
+                    ${botElegido === 'sapo' ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                >
+                  <SapoAvatar className="w-10 h-10" />
+                  <span className={`text-xs font-semibold ${botElegido === 'sapo' ? 'text-emerald-300' : 'text-slate-400'}`}>S.A.P.O.</span>
+                  <span className="text-[10px] text-slate-500">Sarcástico</span>
+                </button>
+                <button
+                  onClick={() => setBotElegido('rana')}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition
+                    ${botElegido === 'rana' ? 'bg-sky-500/15 border-sky-500/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                >
+                  <RanaAvatar className="w-10 h-10" />
+                  <span className={`text-xs font-semibold ${botElegido === 'rana' ? 'text-sky-300' : 'text-slate-400'}`}>R.A.N.A.</span>
+                  <span className="text-[10px] text-slate-500">Amigable</span>
+                </button>
+              </div>
             </div>
 
             <div>
