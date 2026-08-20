@@ -38,6 +38,18 @@ export async function cerrarSesion() {
   await supabase.auth.signOut();
 }
 
+// Borra la cuenta del usuario autenticado (y en cascada todos sus datos en organizapp_sync)
+// llamando a una función de Postgres marcada como SECURITY DEFINER que solo puede borrar
+// auth.uid() — nunca cuentas ajenas. Esa función hay que crearla una vez en Supabase
+// (ver README.md); si no existe, esto devuelve un error explicando qué falta.
+export async function eliminarCuenta() {
+  if (!supabase) return { ok: false, error: 'Sincronización no disponible' };
+  const { error } = await supabase.rpc('eliminar_mi_cuenta');
+  if (error) return { ok: false, error: error.message };
+  await supabase.auth.signOut();
+  return { ok: true };
+}
+
 export async function obtenerSesionActual() {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();

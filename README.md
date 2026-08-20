@@ -140,7 +140,37 @@ cp .env.example .env
 Luego vuelve a desplegar (`git push` o "Redeploy" desde el dashboard de Vercel) para que
 tome las nuevas variables — Vite las incrusta en el build, no se leen en tiempo real.
 
-### 5. Usar la sincronización
+### 5. (Necesario para el botón "Eliminar cuenta") crear la función de borrado
+
+La app tiene un botón en Configuración para que cada persona pueda borrar su propia cuenta
+permanentemente. Por seguridad, Supabase no permite borrar una cuenta directamente desde el
+navegador (eso requeriría exponer una clave con privilegios de administrador, algo que nunca
+debe estar en el código del frontend). En su lugar, se crea una función de Postgres que
+**solo puede borrar la cuenta de quien la ejecuta** (nunca cuentas ajenas), y la app la llama
+de forma segura.
+
+En el **SQL Editor** de Supabase, ejecuta:
+
+```sql
+create or replace function eliminar_mi_cuenta()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+grant execute on function eliminar_mi_cuenta() to authenticated;
+```
+
+Al borrar el usuario de `auth.users`, la fila de `organizapp_sync` de esa persona se borra
+sola gracias al `on delete cascade` que ya quedó definido en la tabla. Si no creas esta
+función, el botón de eliminar cuenta va a mostrar un error indicando que la función no existe.
+
+### 6. Usar la sincronización
 1. Abre la app → **Configuración → Sincronización entre dispositivos**.
 2. Crea una cuenta con correo y contraseña (o inicia sesión si ya la tienes).
 3. Repite el inicio de sesión con la misma cuenta en cualquier otro dispositivo.

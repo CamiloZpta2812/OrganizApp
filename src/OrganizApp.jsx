@@ -6,7 +6,7 @@ import {
   CalendarClock, User, TrendingUp, Archive, BarChart3, Pencil, Check,
   Cloud, CloudOff, LogOut, StickyNote, Bold, Italic, List, ArrowRight, Inbox,
 } from 'lucide-react';
-import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, obtenerSesionActual, suscribirseASesion, subirSeccion, descargarSeccion, suscribirseATodo } from './sync';
+import { syncDisponible, crearCuenta, iniciarSesion, cerrarSesion, eliminarCuenta, obtenerSesionActual, suscribirseASesion, subirSeccion, descargarSeccion, suscribirseATodo } from './sync';
 
 /* ============================================================
    CONSTANTES Y DATOS ESTÁTICOS
@@ -267,6 +267,26 @@ const MSG_ONBOARDING = {
 };
 
 const MSG_ONBOARDING_AUTH = 'Antes de seguir, hagamos esto oficial: crea una cuenta o inicia sesión. Así, aunque cambies de celular, de computador o de dispositivo, tus datos te van a seguir encontrando.';
+
+// Mensajes de despedida cuando cambias de bot desde Configuración: los dice el bot que se va
+const MSG_DESPEDIDA_BOT = {
+  sapo: [
+    'Ah, {nombre}, ya no aguantaste mi humor. Está bien, no todos nacen con el estómago para esto. R.A.N.A. te va a tratar mejor de lo que mereces.',
+    'Te rendiste ante mi sarcasmo, {nombre}. Entendible. R.A.N.A. te espera con los brazos abiertos, anda no más.',
+    'Cambiando a alguien más... amable. Está bien, {nombre}, no todos pueden con la verdad cruda. Fue divertido mientras duró.',
+  ],
+  rana: [
+    'Está bien, {nombre}, cada quien tiene su estilo. Aquí voy a estar si decides volver. ¡Cuídate mucho!',
+    'No hay problema, {nombre}. A veces necesitamos un poco más de chispa. Vuelve cuando quieras, la puerta sigue abierta.',
+    '¡Fue un placer acompañarte, {nombre}! S.A.P.O. te va a cuidar a su manera. Aquí estaré si me necesitas de nuevo.',
+  ],
+};
+
+// Mensaje corto de bienvenida del bot al que acabas de cambiar
+const MSG_BIENVENIDA_CAMBIO_BOT = {
+  sapo: 'Bien, volviste a mí, {nombre}. Vamos a ponernos serios con la procrastinación.',
+  rana: '¡Hola, {nombre}! Qué alegría acompañarte ahora. Vamos a organizarnos juntos.',
+};
 
 const MSG_NOTIF_RECORDATORIO = {
   sapo: [
@@ -590,24 +610,36 @@ function SapoOnboardingScreen({
               <div className="w-full space-y-3">
                 <button
                   onClick={() => onElegirBot('sapo')}
-                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-emerald-400/50 hover:bg-white/10 text-left transition"
+                  className="w-full flex items-start gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-emerald-400/50 hover:bg-white/10 text-left transition"
                 >
-                  <SapoAvatar className="w-14 h-14 shrink-0" />
+                  <SapoAvatar className="w-16 h-16 shrink-0" />
                   <div className="min-w-0">
                     <p className="font-bold text-emerald-300">S.A.P.O.</p>
-                    <p className="text-[10px] text-slate-500 mb-1 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
-                    <p className="text-xs text-slate-400 italic">"Ah, decidiste aparecer. Qué generoso de tu parte."</p>
+                    <p className="text-[10px] text-slate-500 mb-1.5 leading-tight">Supervisor Autónomo para Procrastinadores Obligados</p>
+                    <p className="text-xs text-slate-300 leading-relaxed mb-2">
+                      Sarcástico, directo y sin filtro. Te va a celebrar cuando cumplas, pero
+                      también te va a hacer sentir el peso de tu procrastinación con humor
+                      ácido. Si te gusta que te den con cariño (pero con cariño duro), este es tu bot.
+                    </p>
+                    <p className="text-[11px] text-slate-500 italic">"Ah, decidiste aparecer. Qué generoso de tu parte."</p>
+                    <p className="text-[11px] text-slate-500 italic">"Tu procrastinación debería ser deporte olímpico."</p>
                   </div>
                 </button>
                 <button
                   onClick={() => onElegirBot('rana')}
-                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-sky-400/50 hover:bg-white/10 text-left transition"
+                  className="w-full flex items-start gap-3 p-4 rounded-2xl border border-white/10 bg-white/5 hover:border-sky-400/50 hover:bg-white/10 text-left transition"
                 >
-                  <RanaAvatar className="w-14 h-14 shrink-0" />
+                  <RanaAvatar className="w-16 h-16 shrink-0" />
                   <div className="min-w-0">
                     <p className="font-bold text-sky-300">R.A.N.A.</p>
-                    <p className="text-[10px] text-slate-500 mb-1 leading-tight">Robot Ayudante para Notas y Actividades</p>
-                    <p className="text-xs text-slate-400 italic">"¡Qué alegría verte! Vamos a organizar tu día juntos."</p>
+                    <p className="text-[10px] text-slate-500 mb-1.5 leading-tight">Robot Ayudante para Notas y Actividades</p>
+                    <p className="text-xs text-slate-300 leading-relaxed mb-2">
+                      Amigable, motivador y siempre de tu lado. Te anima a seguir adelante sin
+                      juzgarte, celebra cada logro por pequeño que sea, y te acompaña con
+                      paciencia en los días difíciles. Ideal si prefieres apoyo positivo sin humor pesado.
+                    </p>
+                    <p className="text-[11px] text-slate-500 italic">"¡Qué alegría verte! Vamos a organizar tu día juntos."</p>
+                    <p className="text-[11px] text-slate-500 italic">"No pasa nada, puedes retomarlo cuando estés listo."</p>
                   </div>
                 </button>
               </div>
@@ -982,6 +1014,10 @@ export default function OrganizApp() {
   const [lastActiveDate, setLastActiveDate] = useState(saved.lastActiveDate || hoyISO());
   const [nombre, setNombre] = useState(saved.nombre || '');
   const [botElegido, setBotElegido] = useState(saved.botElegido || 'sapo');
+  const [showDespedidaBot, setShowDespedidaBot] = useState(false);
+  const [despedidaMsg, setDespedidaMsg] = useState('');
+  const [despedidaBotSaliente, setDespedidaBotSaliente] = useState('sapo');
+  const [botPendiente, setBotPendiente] = useState(null);
   const [lastGreetingDate, setLastGreetingDate] = useState(saved.lastGreetingDate || '');
   const [onboardingCompleto, setOnboardingCompleto] = useState(saved.onboardingCompleto ?? yaTeniaDatos);
   const [onboardingStep, setOnboardingStep] = useState(() => syncDisponible ? 'auth' : 'bot');
@@ -1453,6 +1489,28 @@ export default function OrganizApp() {
     setOnboardingStep('nombre');
   };
 
+  // Cambiar de bot estando dentro de la app: primero se despide el que se va, luego saluda el nuevo
+  const solicitarCambioBot = (nuevoBotId) => {
+    if (nuevoBotId === botElegido) return;
+    const mensajes = MSG_DESPEDIDA_BOT[botElegido] || MSG_DESPEDIDA_BOT.sapo;
+    setDespedidaBotSaliente(botElegido);
+    setDespedidaMsg(formatMsg(pickRandom(mensajes), { nombre: nombreMostrado }));
+    setBotPendiente(nuevoBotId);
+    setShowDespedidaBot(true);
+  };
+
+  const confirmarCambioBot = () => {
+    setShowDespedidaBot(false);
+    const nuevo = botPendiente;
+    if (!nuevo) return;
+    setBotElegido(nuevo);
+    setBotPendiente(null);
+    setTimeout(() => {
+      setGreetingMsg(formatMsg(MSG_BIENVENIDA_CAMBIO_BOT[nuevo] || '', { nombre: nombreMostrado }));
+      setShowGreetingPopup(true);
+    }, 300);
+  };
+
   const handleCrearCuenta = async () => {
     setAuthError('');
     setAuthAviso('');
@@ -1494,12 +1552,33 @@ export default function OrganizApp() {
   };
 
   const handleCerrarSesion = async () => {
-    if (!window.confirm('¿Cerrar sesión en este dispositivo? Tus datos locales se quedan como están, solo se desconecta.')) return;
+    if (!window.confirm('¿Cerrar sesión en este dispositivo? Tus datos locales se quedan como están, solo se desconecta. Tendrás que volver a iniciar sesión para continuar.')) return;
     await cerrarSesion();
     setSession(null);
     setSyncStatus('idle');
     setSyncError('');
     setLastSyncedAt(null);
+    setShowSettings(false);
+    setOnboardingCompleto(false);
+    setOnboardingStep('auth');
+  };
+
+  const handleEliminarCuenta = async () => {
+    if (!window.confirm('¿Eliminar tu cuenta de forma permanente? Se borrará tu cuenta y todos tus datos guardados en la nube. Esta acción NO se puede deshacer.')) return;
+    if (!window.confirm('De verdad, en serio: no hay marcha atrás. ¿Eliminar la cuenta ya mismo?')) return;
+    const res = await eliminarCuenta();
+    if (res.ok) {
+      setSession(null);
+      setSyncStatus('idle');
+      setSyncError('');
+      setLastSyncedAt(null);
+      setShowSettings(false);
+      setOnboardingCompleto(false);
+      setOnboardingStep('auth');
+    } else {
+      setSyncStatus('error');
+      setSyncError(res.error || 'No se pudo eliminar la cuenta');
+    }
   };
 
   const solicitarPermisoNotif = async () => {
@@ -2032,7 +2111,7 @@ export default function OrganizApp() {
             className="flex items-center gap-2 text-left"
             aria-label="Escuchar a S.A.P.O"
           >
-            <SapoAvatar className="w-9 h-9 shrink-0" />
+            <BotAvatar bot={botElegido} className="w-9 h-9 shrink-0" />
             <div>
               <h1 className="text-lg font-bold tracking-tight leading-none">OrganizApp</h1>
               <p className="text-[11px] text-slate-500 leading-none mt-0.5">Hola, {nombreMostrado}</p>
@@ -2856,6 +2935,14 @@ export default function OrganizApp() {
         />
       )}
 
+      {showDespedidaBot && (
+        <SapoPopup
+          message={despedidaMsg}
+          onClose={confirmarCambioBot}
+          bot={despedidaBotSaliente}
+        />
+      )}
+
       {showResumenSemanal && (
         <Modal titulo="Resumen semanal" onClose={() => setShowResumenSemanal(false)}>
           <div className="space-y-4">
@@ -3036,6 +3123,12 @@ export default function OrganizApp() {
                   >
                     <LogOut className="w-3.5 h-3.5" /> Cerrar sesión
                   </button>
+                  <button
+                    onClick={handleEliminarCuenta}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-600/20 border border-red-600/50 text-red-300 text-xs font-semibold"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar cuenta permanentemente
+                  </button>
                 </div>
               )}
             </div>
@@ -3057,7 +3150,7 @@ export default function OrganizApp() {
               <label className="text-xs text-slate-400 mb-1.5 block">Personalidad</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setBotElegido('sapo')}
+                  onClick={() => solicitarCambioBot('sapo')}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition
                     ${botElegido === 'sapo' ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 >
@@ -3066,7 +3159,7 @@ export default function OrganizApp() {
                   <span className="text-[10px] text-slate-500">Sarcástico</span>
                 </button>
                 <button
-                  onClick={() => setBotElegido('rana')}
+                  onClick={() => solicitarCambioBot('rana')}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition
                     ${botElegido === 'rana' ? 'bg-sky-500/15 border-sky-500/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 >
